@@ -1,0 +1,141 @@
+# --- THE FRAMEWORK (YAML VERSION) ---
+
+RESPONSES:
+  "betterbd":
+    reply: true
+    delay: 2
+    replies: [🐦, 🐤, 🐣, 🐥, 🐔, 🐓, 🐧, 🕊️, 🦅, 🦆, 🦉, 🦜, 🦢, 🦩, 🦚, 🦃, 🦤, 🪿]
+    edit_to:
+      - FUCK it flew away
+      - GOD FUCKING DAMNIT
+      - I ALWAYS MESS EVERYTHING UP <:HDGAW:1467810721323811054>
+      - NOOOOO
+
+  "stein saks papir":
+    replies:
+        - your move
+    submessages:
+      "stein":
+        replies:
+          - stein, tie <:HDGAW:1467810721323811054>
+          - saks, wiener <:HDYab:1468551896125014107>
+          - papir, taper <:HDGAW:1467810721323811054>
+      "saks":
+        replies:
+          - stein, taper <:HDGAW:1467810721323811054>
+          - saks, tie <:HDGAW:1467810721323811054>
+          - papir, wiener <:HDYab:1468551896125014107>
+      "papir":
+        replies:
+          - stein, wiener <:HDYab:1468551896125014107>
+          - saks, taper <:HDGAW:1467810721323811054>
+          - papir, tie <:HDGAW:1467810721323811054>
+
+  "hey poopid, log in >:3":
+    reply: true
+    delay: 3
+    replies: 
+        - https://tenor.com/bmPqn.gif
+    edit_to: 
+        - welcome {user} >:3 who would you like to hack next?
+    submessages:
+      "":
+        replies: 
+            - Hacking {content}... >:D
+
+  rung:
+    replies: 
+        - poob
+        - grung
+        - jonnect the j1vy
+        - by the nine, im tweaking
+
+  "*testy*":
+    reply: false
+    replies: 
+        - "no"
+        - peepee
+
+  "testy for ai":
+    reply: false
+    delay: 5
+    replies: 
+        - har AI ødelagt noe? :) {count}, {target}, {user}, {name}, {content}, {mock}, {chop}|{chop}
+    edit_to: 
+        - kanskje den har, idk
+    submessages:
+      "worky?":
+        reply: true
+        replies: 
+            - yup
+      "superworky?":
+        edit_to: 
+            - superyup
+
+  "*crazy*":
+    reply: true
+    replies: 
+        - crazy? \ni was crazy once \nthey locked me in a room \na rubber room \na rubber room with rats \nand rats make me crazy
+
+  "*poopid*":
+    reply: false
+    replies: [
+      "hva har du gjort [.](https://tenor.com/YgqtxFHRjx.gif) <:auugh:1471057689118376083>", "ALDRI mention meg", "shit urself", "p", "gay", "fatass", "stupid says {content}",
+      "https://media.discordapp.net/attachments/1069557445061521481/1171874089158320248/togif.gif", "JEG HADDE BRA RUN PÅ ACU BRO FUCK YOUUU [.](https://cdn.discordapp.com/attachments/1069557445061521481/1461642613139574929/IMG_0706.gif)",
+      "im currently exploding the toiler at the closest mcdonalds, wait like 5 hours", "kommer til å drite på deg", "sillybot er mid tbh", "ts pmo frfr", "\"{mock}\" SHUT THE FUCK UP",
+      "du er en så stor furry", "call me cynical the way i inflate pyro", "she {chop} on my {chop} till i {chop}", "yuj", "nuj", "guj", "IM SOWRGYYY <:puresadnessnoik:1471081922896855051>",
+      "NO", "YES", "STUPID", "im grunging it, holdo n", "WHAT THE FUCK BRO <:reaction:1471080948488732736>", "ja? hva er det?", "HVA VIL DUUUUUU!!!!!", "Alex er poob", "Even er poober",
+      "Marius er poobest", "meth dealer told me to shit myself, little did he know...", "call me poopidoopi the way my poop be droopy", "er ikke dette sant <@1139901395819044894>?",
+      "POOPID, EXPLODEEEE!!!!!!!!!!! [.](https://cdn.discordapp.com/attachments/1270711149415104584/1471089296550264844/freeze.gif)", "THY END IS NOW!", "neste gang dere spiller peak er <t:2546346780:f>",
+      "neste gang dere spiller repo er <t:2546346780:f>", "im the grungler >:)", "im gonna grungle you", "ambatakum", "Hello, im Poopid! How can i help you?", "HIIIIII <a:HII2:1471121229292376157>",
+      "HEWWOOOO!! >-< <a:HII2:1471121229292376157>", "have sex with me right now.", "shitfuck assape", "sexy monkeys in your area", "mmghhf~~", "NUH UH", "jeg spiller dart, med sillybot ofc",
+      "sillybot? more like slybot... bcuz... becuz she uhm... sly...?", "stupid fart", "shut up, im listening to the lore of the grungs podcast", "denne messagen er en 1/{count} sjangse",
+      "apple second silliest bot", "im not sillier than THE sillybot herself", "eple beste {content}", "j{chop} j{chop} j{chop} j{chop} j{chop}", "plane remover best snong", "i be shartin' and fartin' and poobin' and larpin'",
+      "jeg er den nye sillybot!", "jeg har en mega supireoritydu complex og jeg kan ikke fuckings skrive >:(", "oifepwaiouafuhwaiuefwhaefiualfhiueauidk hva jeg gjør", "jeg trenger en poopid nft",
+      "im so poopid", "jeg er ikke engang poopid, jeg er bare sillybot i disguise", "im poopiding it", "I AM POOBINUS PRIME", "poopid prime, nye prime soul", "funny poopy fartypants",
+      "å skrive disse responses er bra måte å vente random tanker", "jeg liker menn, men dere vil aldri vite fordi jeg er buried i alle disse responses", "grunger best bot", "just a peek into my sick and twisted mind :3",
+      "mug :)", "gorg", "YOU'VE GRUNGED YOUR LAST BRUNG"]
+
+  "what was?":
+    replies: 
+        - \"{target}\", dumb fuck
+
+CHANCE_EVENTS:
+  "stupid_says":
+    chance: 1000
+    reply: true
+    replies: 
+        - WOW, {user} thats a 1/1k chance?!
+        - 1/10k CHANCE NO WAY {user}
+        - HOLY SHIT NO FUCKING WAY DET R NO WAY DETUEIUFSFUHFSOUH?!?!??!
+    submessages:
+      "":
+        edit_to: 
+        - stupid says \"{content}\"
+        
+  "mocking":
+    chance: 1000
+    reply: true
+    replies: 
+    - \"{mock}\"<:smock:1468515917754400778><:smock:1468515917754400778><:smock:1468515917754400778>
+    
+  "random_replies":
+    chance: 1000
+    reply: true
+    replies: 
+        - frrrr
+        - helt enig
+        - nah det gir ikke mening
+        - wuh?
+    
+  "WAAAAT_replies":
+    chance: 1000
+    reply: true
+    replies: 
+        - https://media.discordapp.net/attachments/1069557445061521481/1471086639005696183/reaction.jpg?ex=698da7b2&is=698c5632&hm=e51ecc132faa98e15e748e3044492d485b88bf7b1068a5cae5adce733826d45e&=&format=webp&width=925&height=891
+
+  "silly-bot_replies":
+    chance: 1000
+    reply: true
+    replies: 
+        - er dette sant <@1139901395819044894>?
