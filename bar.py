@@ -2,10 +2,11 @@ import discord
 import random
 import os
 
-async def scrape_source(ctx, source_id, filename, label):
+async def scrape_source(ctx, source_id, filename, label, refresh=False):
     """
-    Fetches latest 20 messages, appends new ones to the log file (no duplicates),
-    then picks a random entry from the file to display.
+    Fetches messages from the source channel.
+    If refresh is True, overwrites the file with the entire channel history.
+    If refresh is False, appends the latest 20 without duplicates.
     
     Format in file: [Author]\nContent\n-# (Link)||ENTRY_SEP||
     """
@@ -19,46 +20,50 @@ async def scrape_source(ctx, source_id, filename, label):
         filename = os.path.join("log", filename)
     
     separator = "||ENTRY_SEP||"
+    limit = None if refresh else 20
+    mode = "w" if refresh else "a"
 
-    # 1. Update the local file with new messages
+    # 1. Update the local file with messages
     try:
         async with ctx.typing():
-            # Fetch latest 20
-            msgs = [m async for m in channel.history(limit=20) if m.content]
+            # Fetch messages
+            msgs = [m async for m in channel.history(limit=limit, oldest_first=refresh) if m.content]
             
-            # Load existing entries to check for duplicates
             existing_entries = set()
-            if os.path.exists(filename):
+            if not refresh and os.path.exists(filename):
                 with open(filename, "r", encoding="utf-8") as f:
                     content_all = f.read()
                     existing_entries = set(e.strip() for e in content_all.split(separator) if e.strip())
 
-            new_entries = []
+            entries_to_write = []
             for m in msgs:
                 # Escape internal newlines in the message content
                 clean_content = m.content.replace('\n', '\\n')
                 
-                # Construct the entry based on preferred formatting
-                # [Author]
-                # Content
-                # -# (Link)
+                # Construct the entry: [Author]\nContent\n-# (Link)
                 formatted_entry = (
                     f"[{m.author.display_name}]\n"
                     f"{clean_content}\n"
                     f"-# ({m.jump_url})"
                 )
                 
-                if formatted_entry not in existing_entries:
-                    new_entries.append(formatted_entry)
-                    existing_entries.add(formatted_entry)
+                if refresh or formatted_entry not in existing_entries:
+                    entries_to_write.append(formatted_entry)
+                    if not refresh:
+                        existing_entries.add(formatted_entry)
 
-            # Append new unique entries
-            if new_entries:
-                with open(filename, "a", encoding="utf-8") as f:
-                    for e in new_entries:
+            # Write entries to file
+            if entries_to_write:
+                with open(filename, mode, encoding="utf-8") as f:
+                    for e in entries_to_write:
                         f.write(e + separator)
+                        
+        if refresh:
+            await ctx.send(f"Successfully refreshed the {label} log with {len(entries_to_write)} messages.")
+            
     except Exception as e:
         print(f"Error updating {label} log: {e}")
+        await ctx.send(f"Failed to scrape {label} source.")
 
     # 2. Pick a random entry from the entire log
     if not os.path.exists(filename):
@@ -80,7 +85,6 @@ async def scrape_source(ctx, source_id, filename, label):
         # For bars, we send the whole block. 
         # For quotes, we exclude the [Author] header.
         if label == "quote":
-            # Split the entry into lines and skip the first line ([Author])
             lines = display_entry.split('\n')
             if len(lines) > 1:
                 display_entry = '\n'.join(lines[1:]) 

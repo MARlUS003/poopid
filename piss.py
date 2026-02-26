@@ -78,7 +78,8 @@ async def sync(ctx):
 @bot.command()
 @commands.check(is_owner_check)
 async def bar_cmd(ctx):
-    await bar.scrape_source(ctx, RGBAR_SOURCE, BAR_LOG, "bar")
+    # Set refresh=True to clear the file and scrape everything
+    await bar.scrape_source(ctx, RGBAR_SOURCE, BAR_LOG, "bar", refresh=True)
 
 @bot.command()
 async def rgbar(ctx):
@@ -87,7 +88,8 @@ async def rgbar(ctx):
 @bot.command()
 @commands.check(is_owner_check)
 async def quote_cmd(ctx):
-    await bar.scrape_source(ctx, RGQUOTE_SOURCE, QUOTE_LOG, "quote")
+    # Set refresh=True to clear the file and scrape everything
+    await bar.scrape_source(ctx, RGQUOTE_SOURCE, QUOTE_LOG, "quote", refresh=True)
 
 @bot.hybrid_command(name="rgquote", description="Get a random quote")
 async def rgquote(ctx: commands.Context):
