@@ -135,7 +135,7 @@ async def to_gif_context(interaction: discord.Interaction, message: discord.Mess
                 attempts += 1
 
             if not os.path.exists(output_path) or os.path.getsize(output_path) > 8 * 1024 * 1024:
-                await interaction.followup.send("shit over 8 mb bruh")
+                await interaction.followup.send("shit over 8 mb, god damn")
                 return
 
             await interaction.followup.send(file=discord.File(output_path, filename="converted.webp"))
