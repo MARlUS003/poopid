@@ -13,7 +13,7 @@ import media_utils  # Import moved media logic
 # --- CONFIGURATION ---
 TOKEN = 'MTQ2NzgwOTIzMjEyMzU5Mjg3Ng.G5FwjN.y_oZO4RpaZy6hje9dCvteu2y2Jcm8Wn1ezTunk'
 CHARS = "abcdefghijklmnopqrstuvwxyzæøå "
-SCORE_FILE = "scores.json"
+SCORE_FILE = "log/scores.json"
 FRAMEWORK_FILE = "framework.yml"
 MAINCHANNEL = 1069557445061521481
 
@@ -238,6 +238,30 @@ async def on_message(message):
         lb = "**--LEADERBOARD--**\n```"
         for i, (uid, d) in enumerate(sorted_scores[:10], 1):
             lb += f"{i}. {d['name']}: {d['score']}\n"
+        await message.channel.send(lb + "```")
+        return
+
+    if content_lower == "clb":
+        scores = load_scores()
+        if not scores: return await message.channel.send("noobs")
+        
+        # Collect all chance event names
+        all_chances = {}
+        for uid, data in scores.items():
+            for chance_name, count in data.get("chances", {}).items():
+                if chance_name not in all_chances:
+                    all_chances[chance_name] = []
+                all_chances[chance_name].append((data["name"], count))
+        
+        if not all_chances: return await message.channel.send("no chances yet")
+        
+        lb = "**---leaderboard---**\n```\n"
+        for chance_name in sorted(all_chances.keys()):
+            lb += f"--{chance_name}--\n"
+            sorted_chance = sorted(all_chances[chance_name], key=lambda x: x[1], reverse=True)
+            for i, (name, count) in enumerate(sorted_chance, 1):
+                lb += f"{i}. {name}: {count}\n"
+            lb += "\n"
         await message.channel.send(lb + "```")
         return
 

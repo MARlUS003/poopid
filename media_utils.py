@@ -92,9 +92,10 @@ async def handle_overlay_gif(ctx, gifname: str):
     if not target_msg:
         return await ctx.send("I couldn't find a message to process!")
 
-    overlay_asset = os.path.abspath(f"{gifname}.gif")
+    # Check for gif inside the 'gifs/' folder
+    overlay_asset = os.path.abspath(os.path.join("gifs", f"{gifname}.gif"))
     if not os.path.exists(overlay_asset):
-        return await ctx.send(f"No gif named `{gifname}.gif` found!")
+        return await ctx.send(f"No gif named `{gifname}.gif` found in the `gifs/` folder!")
 
     media_url = None
     if target_msg.attachments:
@@ -119,81 +120,83 @@ async def handle_overlay_gif(ctx, gifname: str):
 
     await ctx.defer()
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        input_path = os.path.abspath(os.path.join(tmpdir, f"base_media{ext}"))
-        output_path = os.path.abspath(os.path.join(tmpdir, "overlay_output.webp"))
+    # Reimplemented typing indicator for visual feedback during processing
+    async with ctx.typing():
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_path = os.path.abspath(os.path.join(tmpdir, f"base_media{ext}"))
+            output_path = os.path.abspath(os.path.join(tmpdir, "overlay_output.webp"))
 
-        try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
-                async with session.get(media_url) as resp:
-                    if resp.status == 200:
-                        data = await resp.read()
-                        with open(input_path, 'wb') as f:
-                            f.write(data)
-                    else:
-                        return await ctx.send(f"Download failed: HTTP {resp.status}")
-        except Exception as e:
-            return await ctx.send(f"Download error: {e}")
+            try:
+                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
+                    async with session.get(media_url) as resp:
+                        if resp.status == 200:
+                            data = await resp.read()
+                            with open(input_path, 'wb') as f:
+                                f.write(data)
+                        else:
+                            return await ctx.send(f"Download failed: HTTP {resp.status}")
+            except Exception as e:
+                return await ctx.send(f"Download error: {e}")
 
-        try:
-            def get_media_dims(path):
-                cmd = [
-                    "ffprobe", "-v", "error", "-select_streams", "v:0",
-                    "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", path
-                ]
-                result = subprocess.check_output(cmd).decode().strip()
-                w, h = map(int, result.split('x'))
-                return w, h
+            try:
+                def get_media_dims(path):
+                    cmd = [
+                        "ffprobe", "-v", "error", "-select_streams", "v:0",
+                        "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", path
+                    ]
+                    result = subprocess.check_output(cmd).decode().strip()
+                    w, h = map(int, result.split('x'))
+                    return w, h
 
-            orig_w, orig_h = await asyncio.to_thread(get_media_dims, input_path)
-            if orig_w == 0: orig_w = 1
+                orig_w, orig_h = await asyncio.to_thread(get_media_dims, input_path)
+                if orig_w == 0: orig_w = 1
 
-            current_pixel_scale = 800
-            current_quality = 60
+                current_pixel_scale = 800
+                current_quality = 60
 
-            def run_ffmpeg_overlay(scale_val, q_val):
-                is_animated = ext.lower() in ('.gif', '.webp')
-                target_h = int((scale_val / orig_w) * orig_h)
-                
-                filter_str = (
-                    f"[1:v]format=rgba,scale={scale_val}:{target_h}:flags=lanczos[base];"
-                    f"[2:v]format=rgba,scale={scale_val}:{target_h}:flags=lanczos[ovl];"
-                    f"[0:v][base]overlay=format=auto[bg_with_base];"
-                    f"[bg_with_base][ovl]overlay=format=auto:shortest=1"
-                )
-                
-                cmd = ["ffmpeg"]
-                cmd += ["-f", "lavfi", "-i", f"color=c=black@0:s={scale_val}x{target_h}"]
-                if ext.lower() == '.webp':
-                    cmd += ["-vcodec", "libwebp"]
-                if not is_animated: cmd += ["-loop", "1"]
-                cmd += ["-i", input_path]
-                cmd += ["-i", overlay_asset]
-                if not is_animated: cmd += ["-t", "5"]
-                cmd += [
-                    "-vcodec", "libwebp",
-                    "-filter_complex", filter_str,
-                    "-lossless", "0", "-compression_level", "0",
-                    "-q:v", str(q_val),
-                    "-loop", "0", "-an", "-y", output_path
-                ]
-                subprocess.run(cmd, check=True)
+                def run_ffmpeg_overlay(scale_val, q_val):
+                    is_animated = ext.lower() in ('.gif', '.webp')
+                    target_h = int((scale_val / orig_w) * orig_h)
+                    
+                    filter_str = (
+                        f"[1:v]format=rgba,scale={scale_val}:{target_h}:flags=lanczos[base];"
+                        f"[2:v]format=rgba,scale={scale_val}:{target_h}:flags=lanczos[ovl];"
+                        f"[0:v][base]overlay=format=auto[bg_with_base];"
+                        f"[bg_with_base][ovl]overlay=format=auto:shortest=1"
+                    )
+                    
+                    cmd = ["ffmpeg"]
+                    cmd += ["-f", "lavfi", "-i", f"color=c=black@0:s={scale_val}x{target_h}"]
+                    if ext.lower() == '.webp':
+                        cmd += ["-vcodec", "libwebp"]
+                    if not is_animated: cmd += ["-loop", "1"]
+                    cmd += ["-i", input_path]
+                    cmd += ["-i", overlay_asset]
+                    if not is_animated: cmd += ["-t", "5"]
+                    cmd += [
+                        "-vcodec", "libwebp",
+                        "-filter_complex", filter_str,
+                        "-lossless", "0", "-compression_level", "0",
+                        "-q:v", str(q_val),
+                        "-loop", "0", "-an", "-y", output_path
+                    ]
+                    subprocess.run(cmd, check=True)
 
-            await asyncio.to_thread(run_ffmpeg_overlay, current_pixel_scale, current_quality)
+                await asyncio.to_thread(run_ffmpeg_overlay, current_pixel_scale, current_quality)
 
-            attempts = 0
-            while os.path.exists(output_path) and os.path.getsize(output_path) > 8 * 1024 * 1024 and attempts < 4:
-                current_quality -= 15
-                current_pixel_scale = int(current_pixel_scale * 0.7)
-                if current_pixel_scale < 150: break
-                await asyncio.to_thread(run_ffmpeg_overlay, current_pixel_scale, max(current_quality, 10))
-                attempts += 1
+                attempts = 0
+                while os.path.exists(output_path) and os.path.getsize(output_path) > 8 * 1024 * 1024 and attempts < 4:
+                    current_quality -= 15
+                    current_pixel_scale = int(current_pixel_scale * 0.7)
+                    if current_pixel_scale < 150: break
+                    await asyncio.to_thread(run_ffmpeg_overlay, current_pixel_scale, max(current_quality, 10))
+                    attempts += 1
 
-            if not os.path.exists(output_path) or os.path.getsize(output_path) > 8 * 1024 * 1024:
-                return await ctx.send("File is too chunky.")
+                if not os.path.exists(output_path) or os.path.getsize(output_path) > 8 * 1024 * 1024:
+                    return await ctx.send("File is too chunky.")
 
-            await ctx.send(file=discord.File(output_path, filename=f"{gifname}_overlay.webp"))
+                await ctx.send(file=discord.File(output_path, filename=f"{gifname}_overlay.webp"))
 
-        except Exception as e:
-            print(f"[Overlay] FFmpeg error: {e}")
-            await ctx.send(f"Processing failed: {e}")
+            except Exception as e:
+                print(f"[Overlay] FFmpeg error: {e}")
+                await ctx.send(f"Processing failed: {e}")
