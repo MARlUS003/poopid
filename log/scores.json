@@ -5,7 +5,7 @@
         "chances": {
             "silly-bot_replies": 2,
             "stupid_says": 4,
-            "WAAAAT_replies": 2,
+            "WAAAAT_replies": 3,
             "random_replies": 3
         }
     },
@@ -29,8 +29,20 @@
         "name": "seam",
         "chances": {
             "stupid_says": 1,
-            "random_replies": 1,
+            "random_replies": 2,
             "WAAAAT_replies": 1,
+            "silly-bot_replies": 1
+        }
+    },
+    "646937666251915264": {
+        "score": 1,
+        "name": "Karuta",
+        "chances": {}
+    },
+    "1139901395819044894": {
+        "score": 0,
+        "name": "silly bot",
+        "chances": {
             "silly-bot_replies": 1
         }
     }

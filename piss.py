@@ -39,7 +39,7 @@ class PoopidBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
         intents.message_content = True
-        super().__init__(command_prefix="-", intents=intents)
+        super().__init__(command_prefix="-", intents=intents, case_insensitive=True)
 
     async def setup_hook(self):
         # Syncs global commands (including user-installable ones)
@@ -58,7 +58,7 @@ async def smock_context(interaction: discord.Interaction, message: discord.Messa
         await interaction.response.send_message("mock XDD", ephemeral=True)
         return
     mocked = "".join(c.upper() if i % 2 else c.lower() for i, c in enumerate(content))
-    await interaction.response.send_message(f"\"{mocked}\" <:smock:1474063707888947291><:smock:1474063707888947291><:smock:1474063707888947291>")
+    await interaction.response.send_message(f"\"{mocked}\" <:smock:1468515917754400778><:smock:1468515917754400778><:smock:1468515917754400778>")
 
 
 @bot.tree.context_menu(name="To GIF")
@@ -197,10 +197,34 @@ async def send_formatted_message(destination, text, msg_obj, config=None):
             use_reply_feature = reply_cfg[0]
             if len(reply_cfg) > 1: mention_author = reply_cfg[1]
         else: mention_author = bool(reply_cfg)
+    
+    # Handle {missile} template
+    file_to_send = None
+    if "{missile}" in formatted_text and msg_obj:
+        print(f"[DEBUG] Found {{missile}} in formatted_text: {formatted_text}")
+        formatted_text = formatted_text.replace("{missile}", "").strip()
+        username = msg_obj.author.display_name
+        missile_path = os.path.join("gifs", f"{username}missile.webp")
+        print(f"[DEBUG] Username: {username}")
+        print(f"[DEBUG] Looking for missile file at: {missile_path}")
+        print(f"[DEBUG] File exists: {os.path.exists(missile_path)}")
+        if os.path.exists(missile_path):
+            file_to_send = discord.File(missile_path, filename="missile.webp")
+            print(f"[DEBUG] File loaded successfully")
+        else:
+            print(f"[DEBUG] File not found at {missile_path}")
+    
+    # Ensure there's content to send (either text or a file)
+    if not formatted_text and not file_to_send:
+        print(f"[DEBUG] No text and no file, returning None")
+        return None
+    
+    print(f"[DEBUG] Sending message. formatted_text: '{formatted_text}', has_file: {file_to_send is not None}")
+    
     if use_reply_feature and msg_obj:
-        sent_msg = await msg_obj.reply(formatted_text, mention_author=mention_author)
+        sent_msg = await msg_obj.reply(formatted_text or " ", mention_author=mention_author, file=file_to_send)
     else:
-        sent_msg = await destination.send(formatted_text)
+        sent_msg = await destination.send(formatted_text or " ", file=file_to_send)
     if config and "edit_to" in config:
         await asyncio.sleep(config.get("delay", 0))
         edit_options = config["edit_to"]

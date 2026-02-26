@@ -176,20 +176,20 @@ async def handle_overlay_gif(ctx, gifname: str):
                     cmd += [
                         "-vcodec", "libwebp",
                         "-filter_complex", filter_str,
-                        "-lossless", "0", "-compression_level", "0",
+                        "-compression_level", "0",
                         "-q:v", str(q_val),
-                        "-loop", "0", "-an", "-y", output_path
+                        "-loop", "0", "-y", output_path
                     ]
                     subprocess.run(cmd, check=True)
 
                 await asyncio.to_thread(run_ffmpeg_overlay, current_pixel_scale, current_quality)
 
                 attempts = 0
-                while os.path.exists(output_path) and os.path.getsize(output_path) > 8 * 1024 * 1024 and attempts < 4:
+                while os.path.exists(output_path) and os.path.getsize(output_path) > 8 * 1024 * 1024 and attempts < 2:
                     current_quality -= 15
-                    current_pixel_scale = int(current_pixel_scale * 0.7)
-                    if current_pixel_scale < 150: break
-                    await asyncio.to_thread(run_ffmpeg_overlay, current_pixel_scale, max(current_quality, 10))
+                    current_pixel_scale = int(current_pixel_scale * 0.8)
+                    if current_pixel_scale < 200: break
+                    await asyncio.to_thread(run_ffmpeg_overlay, current_pixel_scale, max(current_quality, 20))
                     attempts += 1
 
                 if not os.path.exists(output_path) or os.path.getsize(output_path) > 8 * 1024 * 1024:

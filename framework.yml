@@ -53,8 +53,7 @@ RESPONSES:
   "*testy*":
     reply: false
     replies: 
-        - \"{target}\"
-        - peepee
+        - "{missile}"
 
   "testy for ai":
     reply: false
@@ -99,7 +98,7 @@ RESPONSES:
       "jeg er den nye sillybot!", "jeg har en mega supireoritydu complex og jeg kan ikke fuckings skrive >:(", "oifepwaiouafuhwaiuefwhaefiualfhiueauidk hva jeg gjør", "jeg trenger en poopid nft",
       "im so poopid", "jeg er ikke engang poopid, jeg er bare sillybot i disguise", "im poopiding it", "I AM POOBINUS PRIME", "poopid prime, nye prime soul", "funny poopy fartypants",
       "å skrive disse responses er bra måte å vente random tanker", "jeg liker menn, men dere vil aldri vite fordi jeg er buried i alle disse responses", "grunger best bot", "just a peek into my sick and twisted mind :3",
-      "mug :)", "gorg", "YOU'VE GRUNGED YOUR LAST BRUNG"]
+      "mug :)", "gorg", "YOU'VE GRUNGED YOUR LAST BRUNG", "{missile}"]
 
   "what was?":
     replies: 
