@@ -53,7 +53,7 @@ RESPONSES:
   "*testy*":
     reply: false
     replies: 
-        - "{target}"
+        - \"{target}\"
         - peepee
 
   "testy for ai":

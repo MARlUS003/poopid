@@ -7,19 +7,19 @@ import asyncio
 import time
 import json
 import yaml
-import subprocess
-import tempfile
-import aiohttp
-import bar  # Import the new bar logic
-import dotenv
+import bar  # Import the updated bar logic
+import media_utils  # Import moved media logic
 
 # --- CONFIGURATION ---
-dotenv.load_dotenv()
-TOKEN = os.getenv("TOKEN")
+TOKEN = 'MTQ2NzgwOTIzMjEyMzU5Mjg3Ng.G5FwjN.y_oZO4RpaZy6hje9dCvteu2y2Jcm8Wn1ezTunk'
 CHARS = "abcdefghijklmnopqrstuvwxyzæøå "
 SCORE_FILE = "scores.json"
 FRAMEWORK_FILE = "framework.yml"
 MAINCHANNEL = 1069557445061521481
+
+# Log Paths
+BAR_LOG = os.path.join("log", "bar.txt")
+QUOTE_LOG = os.path.join("log", "quotes.txt")
 
 # ADD YOUR USER ID HERE
 OWNER_IDS = [1271500729537794229]
@@ -42,6 +42,7 @@ class PoopidBot(commands.Bot):
         super().__init__(command_prefix="-", intents=intents)
 
     async def setup_hook(self):
+        # Syncs global commands (including user-installable ones)
         await self.tree.sync()
         print(f"Synced slash/context commands for {self.user}")
 
@@ -62,88 +63,8 @@ async def smock_context(interaction: discord.Interaction, message: discord.Messa
 
 @bot.tree.context_menu(name="To GIF")
 async def to_gif_context(interaction: discord.Interaction, message: discord.Message):
-    """Converts an attached video or video in embed to an Animated WebP (higher quality/faster than GIF)."""
-    video_url = None
-
-    # 1. Check for direct attachments
-    video_attachment = next((a for a in message.attachments if a.content_type and "video" in a.content_type), None)
-    if video_attachment:
-        video_url = video_attachment.url
-
-    # 2. Check for video in embeds
-    if not video_url:
-        for embed in message.embeds:
-            if embed.video and embed.video.url:
-                video_url = embed.video.url
-                break
-
-    if not video_url:
-        await interaction.response.send_message("use the command on a video, you dumbass", ephemeral=True)
-        return
-
-    await interaction.response.defer(thinking=True)
-    start_total = time.time()
-    print(f"[To GIF] Starting conversion for {video_url}")
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        input_path = os.path.join(tmpdir, "input_vid")
-        output_path = os.path.join(tmpdir, "output.webp")
-
-        try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as session:
-                async with session.get(video_url) as resp:
-                    if resp.status == 200:
-                        data = await resp.read()
-                        await asyncio.to_thread(lambda: open(input_path, 'wb').write(data))
-                        print(f"[To GIF] Downloaded {len(data)} bytes")
-                    else:
-                        await interaction.followup.send("stupid video")
-                        return
-        except Exception as e:
-            await interaction.followup.send(f"Dumbass video wont download >:(: {e}")
-            return
-
-        try:
-            current_scale_filter = "iw/2:ih/2"
-            quality = 60
-
-            def run_ffmpeg_webp(scale_str, q_val):
-                print(f"[To GIF] Running FFmpeg: Scale={scale_str}, Q={q_val}")
-                # Removing capture_output so logs go to console
-                subprocess.run([
-                    "ffmpeg", "-i", input_path,
-                    "-vcodec", "libwebp",
-                    "-filter_complex", f"fps=30,scale={scale_str}:flags=lanczos",
-                    "-lossless", "0",
-                    "-compression_level", "0",
-                    "-q:v", str(q_val),
-                    "-loop", "0",
-                    "-an",
-                    "-y", output_path
-                ], check=True)
-
-            await asyncio.to_thread(run_ffmpeg_webp, current_scale_filter, quality)
-
-            attempts = 0
-            pixel_scale = 480
-            while os.path.exists(output_path) and os.path.getsize(output_path) > 8 * 1024 * 1024 and attempts < 4:
-                print(f"[To GIF] Too big ({os.path.getsize(output_path)} bytes), retrying...")
-                quality -= 15
-                scale_str = f"{pixel_scale}:-1"
-                await asyncio.to_thread(run_ffmpeg_webp, scale_str, max(quality, 10))
-                pixel_scale = int(pixel_scale * 0.7)
-                attempts += 1
-
-            if not os.path.exists(output_path) or os.path.getsize(output_path) > 8 * 1024 * 1024:
-                await interaction.followup.send("shit over 8 mb, god damn")
-                return
-
-            await interaction.followup.send(file=discord.File(output_path, filename="converted.webp"))
-            print(f"[To GIF] Done in {time.time() - start_total:.2f}s")
-
-        except Exception as e:
-            print(f"[To GIF] Error: {e}")
-            await interaction.followup.send(f"ffmpeg killed itself: {e}")
+    """Converts an attached video or video in embed to an Animated WebP."""
+    await media_utils.handle_to_gif(interaction, message)
 
 
 #---------- REGULAR COMMANDS ----------
@@ -157,130 +78,31 @@ async def sync(ctx):
 @bot.command()
 @commands.check(is_owner_check)
 async def bar_cmd(ctx):
-    await bar.scrape_rgbar(ctx, RGBAR_SOURCE, refresh=True)
+    await bar.scrape_source(ctx, RGBAR_SOURCE, BAR_LOG, "bar")
 
 @bot.command()
 async def rgbar(ctx):
-    await bar.scrape_rgbar(ctx, RGBAR_SOURCE, refresh=False)
+    await bar.scrape_source(ctx, RGBAR_SOURCE, BAR_LOG, "bar")
 
-@bot.command(name="g")
-async def overlay_gif(ctx, gifname: str = None):
-    """Overlays a specified gif (from the local folder) on top of a replied message's image or gif."""
-    if not gifname:
-        return await ctx.send("You need to specify a gif name! Usage: `-g missile` or `-g carcrash`")
+@bot.command()
+@commands.check(is_owner_check)
+async def quote_cmd(ctx):
+    await bar.scrape_source(ctx, RGQUOTE_SOURCE, QUOTE_LOG, "quote")
 
-    if not ctx.message.reference:
-        return await ctx.send(f"Reply to a message to overlay `{gifname}` on it!")
+@bot.hybrid_command(name="rgquote", description="Get a random quote")
+async def rgquote(ctx: commands.Context):
+    await bar.scrape_source(ctx, RGQUOTE_SOURCE, QUOTE_LOG, "quote")
 
-    # Check if the requested gif exists locally
-    overlay_asset = os.path.abspath(f"{gifname}.gif")
-    if not os.path.exists(overlay_asset):
-        return await ctx.send(f"I don't have a gif named `{gifname}.gif` in my folder!")
-
-    replied_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
-    media_url = None
-    
-    if replied_msg.attachments:
-        att = replied_msg.attachments[0]
-        if any(att.filename.lower().endswith(e) for e in ('.png', '.jpg', '.jpeg', '.gif', '.webp')):
-            media_url = att.url
-    
-    if not media_url and replied_msg.embeds:
-        emb = replied_msg.embeds[0]
-        target = emb.image or emb.thumbnail
-        if target and target.url:
-            media_url = target.url
-
-    if not media_url:
-        return await ctx.send("I couldn't find an image or gif in that message!")
-
-    # Determine extension of source media
-    ext = ".gif"
-    for e in ('.png', '.jpg', '.jpeg', '.gif', '.webp'):
-        if media_url.lower().split('?')[0].endswith(e):
-            ext = e
-            break
-
-    await ctx.typing()
-    start_total = time.time()
-    print(f"[Overlay] Starting process for {media_url} with {gifname}")
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        input_path = os.path.abspath(os.path.join(tmpdir, f"base_media{ext}"))
-        output_path = os.path.abspath(os.path.join(tmpdir, "overlay_output.webp"))
-
-        try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
-                async with session.get(media_url) as resp:
-                    if resp.status == 200:
-                        data = await resp.read()
-                        with open(input_path, 'wb') as f:
-                            f.write(data)
-                    else:
-                        return await ctx.send(f"Download failed: HTTP {resp.status}")
-        except Exception as e:
-            return await ctx.send(f"Download error: {e}")
-
-        try:
-            def get_media_dims(path):
-                cmd = [
-                    "ffprobe", "-v", "error", "-select_streams", "v:0",
-                    "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", path
-                ]
-                result = subprocess.check_output(cmd).decode().strip()
-                w, h = map(int, result.split('x'))
-                return w, h
-
-            orig_w, orig_h = await asyncio.to_thread(get_media_dims, input_path)
-            
-            current_pixel_scale = 800
-            current_quality = 60
-
-            def run_ffmpeg_overlay(scale_val, q_val):
-                is_animated = ext.lower() in ('.gif', '.webp')
-                target_h = int((scale_val / orig_w) * orig_h)
-                
-                filter_str = (
-                    f"[0:v]fps=30,scale={scale_val}:{target_h}:flags=lanczos[base];"
-                    f"[1:v]fps=30,scale={scale_val}:{target_h}:flags=lanczos[ovl];"
-                    f"[base][ovl]overlay=0:0:shortest=1"
-                )
-                
-                cmd = ["ffmpeg"]
-                if not is_animated: cmd += ["-loop", "1"]
-                if ext.lower() == '.webp': cmd += ["-vcodec", "libwebp"]
-                
-                cmd += ["-i", input_path, "-i", overlay_asset]
-                if not is_animated: cmd += ["-t", "5"]
-                
-                cmd += [
-                    "-vcodec", "libwebp",
-                    "-filter_complex", filter_str,
-                    "-lossless", "0", "-compression_level", "0",
-                    "-q:v", str(q_val),
-                    "-loop", "0", "-an", "-y", output_path
-                ]
-                subprocess.run(cmd, check=True)
-
-            await asyncio.to_thread(run_ffmpeg_overlay, current_pixel_scale, current_quality)
-
-            attempts = 0
-            while os.path.exists(output_path) and os.path.getsize(output_path) > 8 * 1024 * 1024 and attempts < 4:
-                current_quality -= 15
-                current_pixel_scale = int(current_pixel_scale * 0.7)
-                if current_pixel_scale < 150: break
-                await asyncio.to_thread(run_ffmpeg_overlay, current_pixel_scale, max(current_quality, 10))
-                attempts += 1
-
-            if not os.path.exists(output_path) or os.path.getsize(output_path) > 8 * 1024 * 1024:
-                return await ctx.send("File is too chunky even after shrinking.")
-
-            await ctx.send(file=discord.File(output_path, filename=f"{gifname}_overlay.webp"))
-            print(f"[Overlay] Done in {time.time() - start_total:.2f}s")
-
-        except Exception as e:
-            print(f"[Overlay] FFmpeg error: {e}")
-            await ctx.send("Processing failed.")
+@bot.hybrid_command(
+    name="g", 
+    description="Overlay a local gif on a message",
+)
+@app_commands.describe(gifname="The name of the gif file (without .gif)")
+@app_commands.allowed_installs(guilds=True, users=True)
+@app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
+async def overlay_gif(ctx: commands.Context, gifname: str = None):
+    """Overlays a specified gif on top of a replied message's image or gif."""
+    await media_utils.handle_overlay_gif(ctx, gifname)
 
 
 #---------- FRAMEWORK LOADER ----------
@@ -420,7 +242,7 @@ async def on_message(message):
     if content_lower == "what was?":
         old_target = minigame_state["target"]
         generate_new_target()
-        await message.reply(f'"{old_target}", dumbass')
+        await message.reply(f'"{old_target}", dumb fuck')
         return
 
     if current_time - minigame_state["last_gen"] > 43200: generate_new_target()

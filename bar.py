@@ -2,71 +2,91 @@ import discord
 import random
 import os
 
-async def scrape_rgbar(ctx, source_channel_id, refresh=False):
+async def scrape_source(ctx, source_id, filename, label):
     """
-    Scrapes messages from the source channel.
-    If refresh is True, overwrites the file.
-    If refresh is False, appends the latest 10 without duplicates.
+    Fetches latest 20 messages, appends new ones to the log file (no duplicates),
+    then picks a random entry from the file to display.
+    
+    Format in file: [Author]\nContent\n-# (Link)||ENTRY_SEP||
     """
-    channel = ctx.bot.get_channel(source_channel_id)
+    channel = ctx.bot.get_channel(source_id)
     if not channel:
-        print(f"Error: Could not find channel {source_channel_id}")
-        return
+        return await ctx.send(f"Can't find the {label} source channel.")
 
-    print(f"Fetching messages from {channel.name}...")
+    os.makedirs("log", exist_ok=True)
+    # Ensure filename points to the correct log directory if not already
+    if not filename.startswith("log/"):
+        filename = os.path.join("log", filename)
     
-    file_path = "bar.txt"
-    limit = None if refresh else 10
-    mode = "w" if refresh else "a+"
-    
+    separator = "||ENTRY_SEP||"
+
+    # 1. Update the local file with new messages
     try:
-        existing_lines = set()
-        # We use a unique separator to treat the multi-line entry as one "unit" in the file
-        separator = "||ENTRY_SEP||"
+        async with ctx.typing():
+            # Fetch latest 20
+            msgs = [m async for m in channel.history(limit=20) if m.content]
+            
+            # Load existing entries to check for duplicates
+            existing_entries = set()
+            if os.path.exists(filename):
+                with open(filename, "r", encoding="utf-8") as f:
+                    content_all = f.read()
+                    existing_entries = set(e.strip() for e in content_all.split(separator) if e.strip())
 
-        if not refresh and os.path.exists(file_path):
-            with open(file_path, "r", encoding="utf-8") as f:
-                content_all = f.read()
-                existing_lines = set(content_all.split(separator))
-
-        entries_to_write = []
-        async for message in channel.history(limit=limit, oldest_first=refresh):
-            if not message.content:
-                continue
+            new_entries = []
+            for m in msgs:
+                # Escape internal newlines in the message content
+                clean_content = m.content.replace('\n', '\\n')
                 
-            # Support for internal newlines within the bar content
-            clean_content = message.content.replace('\n', '\\n')
-            
-            # Format based on the provided image:
-            # [Author]
-            # Content
-            # -# (Link)
-            formatted_entry = (
-                f"[{message.author.display_name}]\n"
-                f"{clean_content}\n"
-                f"-# ({message.jump_url})"
-            )
-            
-            if refresh or formatted_entry not in existing_lines:
-                entries_to_write.append(formatted_entry)
+                # Construct the entry based on preferred formatting
+                # [Author]
+                # Content
+                # -# (Link)
+                formatted_entry = (
+                    f"[{m.author.display_name}]\n"
+                    f"{clean_content}\n"
+                    f"-# ({m.jump_url})"
+                )
+                
+                if formatted_entry not in existing_entries:
+                    new_entries.append(formatted_entry)
+                    existing_entries.add(formatted_entry)
 
-        with open(file_path, mode, encoding="utf-8") as f:
-            for entry in entries_to_write:
-                f.write(entry + separator)
-
-        print(f"Successfully processed {len(entries_to_write)} messages.")
-
-        # Pick random from history
-        if os.path.exists(file_path):
-            with open(file_path, "r", encoding="utf-8") as f:
-                all_text = f.read()
-                entries = [e for e in all_text.split(separator) if e.strip()]
-            
-            if entries:
-                random_entry = random.choice(entries).strip()
-                # Restore any internal newlines that were escaped
-                display_entry = random_entry.replace('\\n', '\n')
-                await ctx.send(display_entry)
-        
+            # Append new unique entries
+            if new_entries:
+                with open(filename, "a", encoding="utf-8") as f:
+                    for e in new_entries:
+                        f.write(e + separator)
     except Exception as e:
-        print(f"An error occurred in bar.py: {e}")
+        print(f"Error updating {label} log: {e}")
+
+    # 2. Pick a random entry from the entire log
+    if not os.path.exists(filename):
+        return await ctx.send(f"The {label} log is empty.")
+
+    try:
+        with open(filename, "r", encoding="utf-8") as f:
+            all_text = f.read()
+            entries = [e for e in all_text.split(separator) if e.strip()]
+
+        if not entries:
+            return await ctx.send(f"No {label}s found in log.")
+
+        random_entry = random.choice(entries).strip()
+        
+        # Restore internal newlines for display
+        display_entry = random_entry.replace('\\n', '\n')
+        
+        # For bars, we send the whole block. 
+        # For quotes, we exclude the [Author] header.
+        if label == "quote":
+            # Split the entry into lines and skip the first line ([Author])
+            lines = display_entry.split('\n')
+            if len(lines) > 1:
+                display_entry = '\n'.join(lines[1:]) 
+            await ctx.send(display_entry)
+        else:
+            await ctx.send(display_entry)
+            
+    except Exception as e:
+        await ctx.send(f"Error parsing log entry: {e}")
