@@ -9,6 +9,7 @@ import json
 import yaml
 import bar  # Import the updated bar logic
 import media_utils  # Import moved media logic
+import clip  # Import clip logic
 
 # --- CONFIGURATION ---
 TOKEN = 'MTQ2NzgwOTIzMjEyMzU5Mjg3Ng.G5FwjN.y_oZO4RpaZy6hje9dCvteu2y2Jcm8Wn1ezTunk'
@@ -20,6 +21,7 @@ MAINCHANNEL = 1069557445061521481
 # Log Paths
 BAR_LOG = os.path.join("log", "bar.txt")
 QUOTE_LOG = os.path.join("log", "quotes.txt")
+SEQUENCES_LOG = os.path.join("log", "sequences.txt")
 
 # ADD YOUR USER ID HERE
 OWNER_IDS = [1271500729537794229]
@@ -27,6 +29,8 @@ OWNER_IDS = [1271500729537794229]
 # Source Channels
 RGBAR_SOURCE = 1285532755194810418
 RGQUOTE_SOURCE = 1314537013063712768
+
+# Clip Log Path
 
 #---------- OWNER CHECK HELPER ----------
 
@@ -91,6 +95,12 @@ async def quote_cmd(ctx):
     # Set refresh=True to clear the file and scrape everything
     await bar.scrape_source(ctx, RGQUOTE_SOURCE, QUOTE_LOG, "quote", refresh=True)
 
+@bot.command()
+@commands.check(is_owner_check)
+async def clip_cmd(ctx):
+    """Scrape all video clips from the clips source channel"""
+    await clip.scrape_clips_source(ctx, bot)
+
 @bot.hybrid_command(name="rgquote", description="Get a random quote")
 async def rgquote(ctx: commands.Context):
     await bar.scrape_source(ctx, RGQUOTE_SOURCE, QUOTE_LOG, "quote")
@@ -105,6 +115,11 @@ async def rgquote(ctx: commands.Context):
 async def overlay_gif(ctx: commands.Context, gifname: str = None):
     """Overlays a specified gif on top of a replied message's image or gif."""
     await media_utils.handle_overlay_gif(ctx, gifname)
+
+@bot.hybrid_command(name="rgclip", description="Get a random clip and forward it")
+async def rgclip(ctx: commands.Context):
+    """Get a random clip from the clips channel and forward it here"""
+    await clip.forward_random_clip(ctx, bot)
 
 
 #---------- FRAMEWORK LOADER ----------
@@ -149,6 +164,43 @@ def save_score(user_id, display_name, event_name=None):
     with open(SCORE_FILE, "w") as f:
         json.dump(scores, f, indent=4)
     return scores[uid_str]["score"]
+
+def save_sequence(target):
+    """Save a new incomplete sequence to the log."""
+    with open(SEQUENCES_LOG, "a", encoding="utf-8") as f:
+        f.write(f'"{target}" []\n')
+
+def mark_sequence_complete(target):
+    """Mark a sequence as complete in the log."""
+    if not os.path.exists(SEQUENCES_LOG):
+        return
+    
+    try:
+        with open(SEQUENCES_LOG, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        
+        with open(SEQUENCES_LOG, "w", encoding="utf-8") as f:
+            for line in lines:
+                if line.strip().startswith(f'"{target}" []'):
+                    f.write(line.replace('[]', '[x]'))
+                else:
+                    f.write(line)
+    except Exception as e:
+        print(f"Error marking sequence complete: {e}")
+
+def old_target_was_marked_complete(target):
+    """Check if a target was already marked as complete in the log."""
+    if not os.path.exists(SEQUENCES_LOG):
+        return False
+    
+    try:
+        with open(SEQUENCES_LOG, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.strip().startswith(f'"{target}" [x]'):
+                    return True
+    except Exception:
+        pass
+    return False
 
 def get_config(content, data_dict):
     if not data_dict: return None
@@ -233,6 +285,11 @@ async def send_formatted_message(destination, text, msg_obj, config=None):
     return sent_msg
 
 def generate_new_target():
+    # Save the old target as incomplete if it wasn't won
+    old_target = minigame_state["target"]
+    if old_target and not old_target_was_marked_complete(old_target):
+        save_sequence(old_target)
+    
     target = "".join(random.choice(CHARS) for _ in range(3))
     minigame_state["target"] = target
     minigame_state["last_gen"] = time.time()
@@ -300,6 +357,7 @@ async def on_message(message):
     target = minigame_state["target"]
     if target and target in content_lower:
         save_score(user_id, message.author.display_name)
+        mark_sequence_complete(target)  # Mark sequence as won
         original_msg = message.content
         trigger_index = content_lower.find(target)
         if trigger_index != -1:
