@@ -81,6 +81,13 @@ RESPONSES:
         a rubber room with rats 
         and rats make me crazy
 
+  # ["poopis", "poopoid", "pooid", "oopid"]:
+  #   replies:
+  #   - "type me right you slungoid"
+  #   - "write it correctly"
+  #   - "{content}... er du seriøs?"
+  #   - "SKRIV DET FUCKINGS RIKTIGGGG"
+
   "*poopid*":
     reply: false
     replies: [

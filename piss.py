@@ -29,7 +29,7 @@ SEQUENCES_LOG = os.path.join("log", "sequences.txt")
 OWNER_IDS = [1271500729537794229]
 
 # User to delete messages from in mainchannel
-TARGET_USER_TO_DELETE = 1467809232123592876
+TARGET_USER_TO_DELETE = 853629533855809596
 
 # Source Channels
 RGBAR_SOURCE = 1285532755194810418
@@ -311,16 +311,21 @@ async def on_ready():
 @bot.event
 async def on_message(message):
     if message.author == bot.user: return
-    
-    # Delete messages from target user in mainchannel
+     
+    # Delete ALL messages from target user in mainchannel (regardless of content/embeds/attachments)
     if message.author.id == TARGET_USER_TO_DELETE and message.channel.id == MAINCHANNEL:
         try:
+            print(f"[DEBUG] CONDITION MET - Deleting message from {message.author.name} (ID: {message.id})")
             await message.delete()
-        except discord.Forbidden:
-            print(f"No permission to delete message from {message.author}")
-        except discord.NotFound:
-            print(f"Message not found or already deleted")
+            print(f"[DEBUG] Successfully deleted message {message.id}")
+        except discord.Forbidden as e:
+            print(f"[ERROR] No permission to delete message: {e}")
+        except discord.NotFound as e:
+            print(f"[ERROR] Message not found or already deleted: {e}")
+        except Exception as e:
+            print(f"[ERROR] Failed to delete message: {type(e).__name__}: {e}")
         return
+    
     
     await bot.process_commands(message)
     content_lower = message.content.lower()
