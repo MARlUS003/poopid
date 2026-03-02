@@ -10,9 +10,11 @@ import yaml
 import bar  # Import the updated bar logic
 import media_utils  # Import moved media logic
 import clip  # Import clip logic
+import dotenv
 
 # --- CONFIGURATION ---
-TOKEN = 'MTQ2NzgwOTIzMjEyMzU5Mjg3Ng.G5FwjN.y_oZO4RpaZy6hje9dCvteu2y2Jcm8Wn1ezTunk'
+dotenv.load_dotenv()
+TOKEN = os.getenv("TOKEN")
 CHARS = "abcdefghijklmnopqrstuvwxyzæøå "
 SCORE_FILE = "log/scores.json"
 FRAMEWORK_FILE = "framework.yml"
@@ -25,6 +27,9 @@ SEQUENCES_LOG = os.path.join("log", "sequences.txt")
 
 # ADD YOUR USER ID HERE
 OWNER_IDS = [1271500729537794229]
+
+# User to delete messages from in mainchannel
+TARGET_USER_TO_DELETE = 1467809232123592876
 
 # Source Channels
 RGBAR_SOURCE = 1285532755194810418
@@ -306,6 +311,17 @@ async def on_ready():
 @bot.event
 async def on_message(message):
     if message.author == bot.user: return
+    
+    # Delete messages from target user in mainchannel
+    if message.author.id == TARGET_USER_TO_DELETE and message.channel.id == MAINCHANNEL:
+        try:
+            await message.delete()
+        except discord.Forbidden:
+            print(f"No permission to delete message from {message.author}")
+        except discord.NotFound:
+            print(f"Message not found or already deleted")
+        return
+    
     await bot.process_commands(message)
     content_lower = message.content.lower()
     user_id, current_time = message.author.id, time.time()

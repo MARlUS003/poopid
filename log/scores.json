@@ -6,14 +6,16 @@
             "silly-bot_replies": 2,
             "stupid_says": 4,
             "WAAAAT_replies": 3,
-            "random_replies": 3
+            "random_replies": 4,
+            "mocking": 1
         }
     },
     "483868190498357248": {
         "score": 0,
         "name": "Deadguana",
         "chances": {
-            "stupid_says": 1
+            "stupid_says": 3,
+            "mocking": 1
         }
     },
     "853629533855809596": {
@@ -21,7 +23,8 @@
         "name": "SOFI",
         "chances": {
             "mocking": 2,
-            "stupid_says": 1
+            "stupid_says": 1,
+            "random_replies": 1
         }
     },
     "279880443200012288": {
@@ -43,7 +46,15 @@
         "score": 0,
         "name": "silly bot",
         "chances": {
-            "silly-bot_replies": 1
+            "silly-bot_replies": 1,
+            "WAAAAT_replies": 1
+        }
+    },
+    "490921471225626647": {
+        "score": 0,
+        "name": "methmer",
+        "chances": {
+            "mocking": 1
         }
     }
 }
