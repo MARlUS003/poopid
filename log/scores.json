@@ -6,8 +6,8 @@
             "silly-bot_replies": 2,
             "stupid_says": 4,
             "WAAAAT_replies": 3,
-            "random_replies": 4,
-            "mocking": 1
+            "random_replies": 6,
+            "mocking": 2
         }
     },
     "483868190498357248": {
@@ -15,7 +15,7 @@
         "name": "Deadguana",
         "chances": {
             "stupid_says": 3,
-            "mocking": 1
+            "mocking": 2
         }
     },
     "853629533855809596": {
