@@ -6,15 +6,15 @@
             "silly-bot_replies": 2,
             "stupid_says": 4,
             "WAAAAT_replies": 3,
-            "random_replies": 6,
-            "mocking": 2
+            "random_replies": 7,
+            "mocking": 4
         }
     },
     "483868190498357248": {
         "score": 0,
         "name": "Deadguana",
         "chances": {
-            "stupid_says": 3,
+            "stupid_says": 4,
             "mocking": 2
         }
     },
@@ -32,9 +32,10 @@
         "name": "seam",
         "chances": {
             "stupid_says": 1,
-            "random_replies": 2,
+            "random_replies": 3,
             "WAAAAT_replies": 2,
-            "silly-bot_replies": 2
+            "silly-bot_replies": 2,
+            "mocking": 1
         }
     },
     "646937666251915264": {
