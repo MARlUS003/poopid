@@ -11,6 +11,8 @@ import bar  # Import the updated bar logic
 import media_utils  # Import moved media logic
 import clip  # Import clip logic
 import dotenv
+import threading
+
 
 # --- CONFIGURATION ---
 dotenv.load_dotenv()
@@ -147,7 +149,7 @@ def load_framework():
 #---------- HELPER FUNCTIONS ----------
 
 user_states = {}
-minigame_state = {"target": "", "last_gen": 0}
+minigame_state = {"target": "", "prev_target": "???", "last_gen": 0, "last_chance": None}
 
 def load_scores():
     if os.path.exists(SCORE_FILE):
@@ -296,6 +298,7 @@ def generate_new_target():
         save_sequence(old_target)
     
     target = "".join(random.choice(CHARS) for _ in range(3))
+    minigame_state["prev_target"] = old_target
     minigame_state["target"] = target
     minigame_state["last_gen"] = time.time()
     return target
@@ -378,6 +381,11 @@ async def on_message(message):
     target = minigame_state["target"]
     if target and target in content_lower:
         save_score(user_id, message.author.display_name)
+        minigame_state["last_chance"] = {
+            "event": name,
+            "user": message.author.display_name,
+            "chance": int(cfg.get("chance", 1000))
+        }
         mark_sequence_complete(target)  # Mark sequence as won
         original_msg = message.content
         trigger_index = content_lower.find(target)
@@ -417,6 +425,13 @@ async def on_message(message):
                 msg = await send_formatted_message(message.channel, random.choice(replies), message, cfg)
                 user_states[user_id] = {"config": cfg, "time": current_time, "bot_msg": msg}
                 break
+
+def start_dashboard():
+    import bot_dashboard
+    bot_dashboard.main(minigame_state)
+
+dashboard_thread = threading.Thread(target=start_dashboard, daemon=True)
+dashboard_thread.start()
 
 if __name__ == "__main__":
     bot.run(TOKEN)
