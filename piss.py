@@ -37,7 +37,9 @@ TARGET_USER_TO_DELETE = 853629533855809596
 RGBAR_SOURCE = 1285532755194810418
 RGQUOTE_SOURCE = 1314537013063712768
 
-# Clip Log Path
+BLACKLISTED_CHANNELS = [
+    1471973862530093302 # gests
+]
 
 #---------- OWNER CHECK HELPER ----------
 
@@ -314,6 +316,7 @@ async def on_ready():
 @bot.event
 async def on_message(message):
     if message.author == bot.user: return
+    if message.channel.id in BLACKLISTED_CHANNELS: return
      
     # Delete ALL messages from target user in mainchannel (regardless of content/embeds/attachments)
     if message.author.id == TARGET_USER_TO_DELETE and message.channel.id == MAINCHANNEL:
@@ -381,6 +384,7 @@ async def on_message(message):
     target = minigame_state["target"]
     if target and target in content_lower:
         save_score(user_id, message.author.display_name)
+        minigame_state["scores_dirty"] = True    # ← add this
         minigame_state["last_chance"] = {
             "event": name,
             "user": message.author.display_name,
@@ -421,6 +425,11 @@ async def on_message(message):
     for name, cfg in CHANCE_EVENTS.items():
         if random.randint(1, int(cfg.get("chance", 1000))) == 1:
             save_score(user_id, message.author.display_name, event_name=name)
+            minigame_state["last_chance"] = {
+                "event": name,
+                "user": message.author.display_name,
+                "chance": int(cfg.get("chance", 1000))
+            }
             if replies := cfg.get("replies", []):
                 msg = await send_formatted_message(message.channel, random.choice(replies), message, cfg)
                 user_states[user_id] = {"config": cfg, "time": current_time, "bot_msg": msg}

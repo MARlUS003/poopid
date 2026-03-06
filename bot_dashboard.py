@@ -5,6 +5,7 @@ import json
 import yaml
 import os
 import datetime
+import threading
 
 # ── file paths ───────────────────────────────────────────────
 QUOTES_FILE    = "log/quotes.txt"
@@ -24,12 +25,12 @@ SW, SH = 480, 320
 BG     = "#0a0a0f"
 PANEL  = "#12121a"
 BORDER = "#2a2a3a"
-ACCENT = "#e2a020"   # amber/gold — easy to read on dark
-CYAN   = "#E8C325"
+ACCENT = "#e2a020"
+CYAN   = "#06b6d4"
 AMBER  = "#f59e0b"
 GREEN  = "#22c55e"
 FG     = "#e2e8f0"
-DIM    = "#4a5568"
+DIM    = "#E8C325"
 
 FS  = ("Courier", 8)
 FB  = ("Courier", 11, "bold")
@@ -115,12 +116,22 @@ class Dashboard:
         self.root.config(cursor="none")
         self.root.bind("<Escape>", lambda e: self.root.destroy())
 
-        self.shared_state  = shared_state or {
-            "target": "???", "prev_target": "???", "last_gen": 0,
-            "last_chance": None  # {"event": str, "user": str, "chance": int}
+        self.shared_state = shared_state or {
+            "target": "???",
+            "prev_target": "???",
+            "last_gen": 0,
+            "last_chance": None,
         }
+
+        # dirty flags — piss.py sets these to True to trigger instant redraws
+        self.shared_state.setdefault("scores_dirty", False)
+        self.shared_state.setdefault("chances_dirty", False)
+
         self.quotes = parse_quotes(QUOTES_FILE)
         self.responses, self.chance_events = load_framework()
+
+        # snapshot of last_chance so we can detect changes
+        self._last_chance_seen = None
 
         self._build_ui()
 
@@ -133,12 +144,6 @@ class Dashboard:
         self.clock_lbl = tk.Label(hdr, text="", font=FS, fg=DIM, bg=PANEL)
         self.clock_lbl.place(x=SW-80, y=5)
         tk.Frame(self.root, bg=BORDER, height=1).place(x=0, y=24, width=SW)
-
-        # LEFT  x=4   w=228   RIGHT x=236 w=240
-        # y=27  total h=293
-        #
-        # LEFT:  quote h=140, minigame h=46, last chance h=100
-        # RIGHT: lb scores h=140, lb chances h=148
 
         self._build_quote(4,   27,  228, 140)
         self._build_minigame(4, 171, 228, 46)
@@ -165,7 +170,7 @@ class Dashboard:
         self.a_lbl.config(text=f"— {a}" if a else "— unknown")
         self.root.after(60000, self._refresh_quote)
 
-    # ── MINIGAME: previous target only ───────────────────────
+    # ── LAST TARGET ──────────────────────────────────────────
     def _build_minigame(self, x, y, w, h):
         f = make_panel(self.root, x, y, w, h, "// LAST TARGET")
         tk.Label(f, text="was:", font=FS, fg=DIM, bg=PANEL).place(x=6, y=6)
@@ -174,37 +179,43 @@ class Dashboard:
         self._refresh_target()
 
     def _refresh_target(self):
-        prev = self.shared_state.get("prev_target", "???")
-        self.prev_tgt_lbl.config(text=prev if prev else "???")
-        self.root.after(2000, self._refresh_target)
+        prev = self.shared_state.get("prev_target") or "???"
+        self.prev_tgt_lbl.config(text=prev)
+        # also check if scores need redraw (target was just hit)
+        if self.shared_state.get("scores_dirty"):
+            self.shared_state["scores_dirty"] = False
+            self._draw_scores()
+        self.root.after(500, self._refresh_target)
 
     # ── LAST CHANCE EVENT ────────────────────────────────────
     def _build_last_chance(self, x, y, w, h):
         f = make_panel(self.root, x, y, w, h, "// LAST CHANCE EVENT")
-        self._lc_frame = f
-        self._lc_w = w
-        self._lc_h = h
 
-        self.lc_event_lbl = tk.Label(f, text="none yet", font=("Courier", 9, "bold"),
-            fg=AMBER, bg=PANEL, anchor="w")
+        self.lc_event_lbl = tk.Label(f, text="none yet",
+            font=("Courier", 9, "bold"), fg=AMBER, bg=PANEL, anchor="w")
         self.lc_event_lbl.place(x=6, y=4, width=w-12)
 
-        self.lc_user_lbl = tk.Label(f, text="", font=FS, fg=FG, bg=PANEL, anchor="w")
+        self.lc_user_lbl = tk.Label(f, text="",
+            font=FS, fg=FG, bg=PANEL, anchor="w")
         self.lc_user_lbl.place(x=6, y=22, width=w-12)
 
-        self.lc_odds_lbl = tk.Label(f, text="", font=FS, fg=GREEN, bg=PANEL, anchor="w")
+        self.lc_odds_lbl = tk.Label(f, text="",
+            font=FS, fg=GREEN, bg=PANEL, anchor="w")
         self.lc_odds_lbl.place(x=6, y=38, width=w-12)
 
-        self._refresh_last_chance()
+        self._poll_last_chance()
 
-    def _refresh_last_chance(self):
+    def _poll_last_chance(self):
         lc = self.shared_state.get("last_chance")
-        if lc:
+        # only redraw if value actually changed
+        if lc is not None and lc is not self._last_chance_seen:
+            self._last_chance_seen = lc
             self.lc_event_lbl.config(text=trunc(lc.get("event", ""), 26))
             self.lc_user_lbl.config(text=f"hit by: {lc.get('user', '?')}")
-            chance = lc.get("chance", 1000)
-            self.lc_odds_lbl.config(text=f"1/{chance} odds")
-        self.root.after(2000, self._refresh_last_chance)
+            self.lc_odds_lbl.config(text=f"1/{lc.get('chance', 1000)} odds")
+            # also instantly refresh the chance leaderboard
+            self._draw_chances()
+        self.root.after(500, self._poll_last_chance)
 
     # ── LEADERBOARD: scores ──────────────────────────────────
     def _build_leaderboard_scores(self, x, y, w, h):
@@ -212,7 +223,7 @@ class Dashboard:
         self._lb_score_frame = f
         self._lb_score_w = w
         self._draw_scores()
-        self.root.after(30000, self._refresh_scores)
+        self.root.after(10000, self._tick_scores)
 
     def _draw_scores(self):
         for c in self._lb_score_frame.winfo_children():
@@ -233,17 +244,17 @@ class Dashboard:
             tk.Label(self._lb_score_frame, text="no scores yet", font=FS,
                      fg=DIM, bg=PANEL).place(x=6, y=6)
 
-    def _refresh_scores(self):
+    def _tick_scores(self):
         self._draw_scores()
-        self.root.after(30000, self._refresh_scores)
+        self.root.after(10000, self._tick_scores)
 
-    # ── LEADERBOARD: chance hits (clb style) ─────────────────
+    # ── LEADERBOARD: chance hits ──────────────────────────────
     def _build_leaderboard_chances(self, x, y, w, h):
         f = make_panel(self.root, x, y, w, h, "// CHANCE HITS")
         self._lb_chance_frame = f
         self._lb_chance_w = w
         self._draw_chances()
-        self.root.after(30000, self._refresh_chances)
+        self.root.after(10000, self._tick_chances)
 
     def _draw_chances(self):
         for c in self._lb_chance_frame.winfo_children():
@@ -267,20 +278,18 @@ class Dashboard:
         for event_name in sorted(all_chances.keys()):
             if ry > 130: break
             top_list = sorted(all_chances[event_name], key=lambda x: x[1], reverse=True)
-            # event name row
             tk.Label(self._lb_chance_frame, text=trunc(event_name, 22),
                      font=("Courier", 7, "bold"), fg=CYAN, bg=PANEL, anchor="w").place(x=4, y=ry)
             ry += 11
-            # top 2 scorers for this event
             for name, count in top_list[:2]:
                 tk.Label(self._lb_chance_frame, text=f"  {trunc(name,12)} ×{count}",
                          font=FS, fg=FG, bg=PANEL, anchor="w").place(x=4, y=ry)
                 ry += 11
-            ry += 3  # gap between events
+            ry += 3
 
-    def _refresh_chances(self):
+    def _tick_chances(self):
         self._draw_chances()
-        self.root.after(30000, self._refresh_chances)
+        self.root.after(10000, self._tick_chances)
 
     # ── CLOCK ────────────────────────────────────────────────
     def _tick(self):

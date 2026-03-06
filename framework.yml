@@ -132,7 +132,7 @@ CHANCE_EVENTS:
     - \"{mock}\"<:smock:1468515917754400778><:smock:1468515917754400778><:smock:1468515917754400778>
     
   "random_replies":
-    chance: 5
+    chance: 1000
     reply: true
     replies: 
         - frrrr
