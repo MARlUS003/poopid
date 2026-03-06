@@ -42,6 +42,7 @@ BLACKLISTED_CHANNELS = [
     1164188907877957722 # nyx-gold
 ]
 
+
 #---------- OWNER CHECK HELPER ----------
 
 def is_owner_check(ctx):

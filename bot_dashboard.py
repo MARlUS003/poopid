@@ -6,6 +6,7 @@ import yaml
 import os
 import datetime
 import threading
+import tkinter.font as tkfont
 
 QUOTES_FILE    = os.path.join("log", "quotes.txt")
 FRAMEWORK_FILE = "framework.yml"
@@ -193,12 +194,29 @@ class Dashboard:
     # ── MAIN LAYOUT ──────────────────────────────────────────
     def _build_ui(self):
         tk.Frame(self.root, bg=ACCENT, height=2).place(x=0, y=0, width=SW)
+
+        # ── header with progress bar behind text ──────────────
         hdr = tk.Frame(self.root, bg=PANEL, height=22)
         hdr.place(x=0, y=2, width=SW)
-        tk.Label(hdr, text="POOPID BOT", font=FB, fg=ACCENT, bg=PANEL).place(x=8, y=2)
-        self.clock_lbl = tk.Label(hdr, text="", font=FS, fg=DIM, bg=PANEL)
-        self.clock_lbl.place(x=SW-80, y=5)
+
+        # progress bar canvas sits behind everything in the header
+        self._bar_canvas = tk.Canvas(hdr, bg=PANEL, highlightthickness=0,
+                                      width=SW, height=22)
+        self._bar_canvas.place(x=0, y=0)
+
+        # filled progress rect (drawn first = behind)
+        self._bar_fill   = self._bar_canvas.create_rectangle(0, 0, 0, 22, fill=DIM, outline="")
+        # lunch block
+        self._bar_lunch  = self._bar_canvas.create_rectangle(0, 0, 0, 22, fill="#FFFFFF", outline="")
+        # current time cursor line
+        self._bar_cursor = self._bar_canvas.create_line(0, 0, 0, 22, fill=FG, width=1)
+
+        # text drawn on canvas — no background rectangle
+        self._bar_title = self._bar_canvas.create_text(8, 11, text="POOPID BOT", font=FB, fill=ACCENT, anchor="w")
+        self._bar_clock = self._bar_canvas.create_text(SW-8, 11, text="", font=FS, fill=DIM, anchor="e")
+
         tk.Frame(self.root, bg=BORDER, height=1).place(x=0, y=24, width=SW)
+        self._update_bar()
 
         self._build_quote(4,   27,  228, 140)
         self._build_minigame(4, 171, 228, 46)
@@ -487,9 +505,48 @@ class Dashboard:
                      anchor="center").place(x=0, y=h-18, width=w)
         self._show_overlay(build)
 
+    # ── DAY PROGRESS BAR ─────────────────────────────────────
+    def _update_bar(self):
+        now   = datetime.datetime.now()
+        DAY_START  = now.replace(hour=8,  minute=0,  second=0, microsecond=0)
+        DAY_END    = now.replace(hour=15, minute=45, second=0, microsecond=0)
+        LUNCH_START = now.replace(hour=11, minute=45, second=0, microsecond=0)
+        LUNCH_END   = now.replace(hour=12, minute=30, second=0, microsecond=0)
+
+        total_secs = (DAY_END - DAY_START).total_seconds()
+
+        def to_x(dt):
+            secs = (dt - DAY_START).total_seconds()
+            return max(0, min(SW, int(SW * secs / total_secs)))
+
+        now_x    = to_x(now)
+        lunch_x1 = to_x(LUNCH_START)
+        lunch_x2 = to_x(LUNCH_END)
+
+        # fill bar (green tint up to now)
+        self._bar_canvas.coords(self._bar_fill, 0, 0, now_x, 22)
+        # lunch block
+        self._bar_canvas.coords(self._bar_lunch, lunch_x1, 0, lunch_x2, 22)
+        # cursor line
+        self._bar_canvas.coords(self._bar_cursor, now_x, 0, now_x, 22)
+
+        # flip title color: black when yellow bar is behind it, accent otherwise
+        # "POOPID BOT" starts at x=8, approx 9 chars * 8px per char at size 11
+        title_mid = 8 + 72 // 2  # ~midpoint of title text
+        title_col = "#000000" if now_x > title_mid else ACCENT
+        self._bar_canvas.itemconfig(self._bar_title, fill=title_col)
+
+        # clock sits at right edge, approx 80px wide
+        clock_mid = SW - 40
+        clock_col = "#000000" if now_x > clock_mid else DIM
+        self._bar_canvas.itemconfig(self._bar_clock, fill=clock_col)
+
+        self.root.after(10000, self._update_bar)  # update every 10s
+
     # ── CLOCK ────────────────────────────────────────────────
     def _tick(self):
-        self.clock_lbl.config(text=datetime.datetime.now().strftime("%H:%M:%S"))
+        now_str = datetime.datetime.now().strftime("%H:%M:%S")
+        self._bar_canvas.itemconfig(self._bar_clock, text=now_str)
         self.root.after(1000, self._tick)
 
 
