@@ -38,7 +38,8 @@ RGBAR_SOURCE = 1285532755194810418
 RGQUOTE_SOURCE = 1314537013063712768
 
 BLACKLISTED_CHANNELS = [
-    1471973862530093302 # gests
+    1471973862530093302, # gests
+    1164188907877957722 # nyx-gold
 ]
 
 #---------- OWNER CHECK HELPER ----------
@@ -110,11 +111,11 @@ async def clip_cmd(ctx):
     """Scrape all video clips from the clips source channel"""
     await clip.scrape_clips_source(ctx, bot)
 
-@bot.hybrid_command(name="rgquote", description="Get a random quote")
-async def rgquote(ctx: commands.Context):
+@bot.command(name="rgquote", description="Get a random quote")
+async def rgquote(ctx):
     await bar.scrape_source(ctx, RGQUOTE_SOURCE, QUOTE_LOG, "quote")
 
-@bot.hybrid_command(
+@bot.command(
     name="g", 
     description="Overlay a local gif on a message",
 )
@@ -125,8 +126,8 @@ async def overlay_gif(ctx: commands.Context, gifname: str = None):
     """Overlays a specified gif on top of a replied message's image or gif."""
     await media_utils.handle_overlay_gif(ctx, gifname)
 
-@bot.hybrid_command(name="rgclip", description="Get a random clip and forward it")
-async def rgclip(ctx: commands.Context):
+@bot.command(name="rgclip", description="Get a random clip and forward it")
+async def rgclip(ctx):
     """Get a random clip from the clips channel and forward it here"""
     await clip.forward_random_clip(ctx, bot)
 

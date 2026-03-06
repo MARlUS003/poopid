@@ -7,8 +7,7 @@ import os
 import datetime
 import threading
 
-# ── file paths ───────────────────────────────────────────────
-QUOTES_FILE    = "log/quotes.txt"
+QUOTES_FILE    = os.path.join("log", "quotes.txt")
 FRAMEWORK_FILE = "framework.yml"
 SCORE_FILE     = os.path.join("log", "scores.json")
 
@@ -21,6 +20,8 @@ DISCORD_USERS = {
 }
 
 SW, SH = 480, 320
+HDR_H  = 25   # header height
+BODY_Y = HDR_H + 2
 
 BG     = "#0a0a0f"
 PANEL  = "#12121a"
@@ -35,8 +36,9 @@ DIM    = "#E8C325"
 FS  = ("Courier", 8)
 FB  = ("Courier", 11, "bold")
 FT  = ("Courier", 20, "bold")
+FZ  = ("Courier", 14, "bold")   # zoom panel title
 
-# ── data loaders ─────────────────────────────────────────────
+# ── data helpers ─────────────────────────────────────────────
 def resolve_author(raw):
     raw = raw.strip()
     raw = re.sub(r'\s+ca\..*$', '', raw).strip()
@@ -97,14 +99,34 @@ def trunc(text, n):
     s = str(text)
     return s if len(s) <= n else s[:n-1] + "…"
 
-def make_panel(root, x, y, w, h, title):
+# ── panel builder ─────────────────────────────────────────────
+def bind_all_children(widget, event, callback):
+    """Recursively bind event to widget and all its children."""
+    widget.bind(event, lambda e: callback())
+    for child in widget.winfo_children():
+        bind_all_children(child, event, callback)
+
+def make_panel(root, x, y, w, h, title, clickable=False, on_click=None):
     outer = tk.Frame(root, bg=BORDER)
     outer.place(x=x, y=y, width=w, height=h)
-    tk.Label(outer, text=title, font=("Courier", 7, "bold"),
-             fg=ACCENT, bg=BORDER, anchor="w").place(x=3, y=1)
+    title_lbl = tk.Label(outer, text=title, font=("Courier", 7, "bold"),
+                          fg=ACCENT, bg=BORDER, anchor="w")
+    title_lbl.place(x=3, y=1)
     inner = tk.Frame(outer, bg=PANEL)
     inner.place(x=1, y=13, width=w-2, height=h-14)
-    return inner
+    if clickable and on_click:
+        # bind now on outer/title/inner, then schedule a recursive bind
+        # after children are packed so labels etc. are also covered
+        for widget in (outer, title_lbl, inner):
+            widget.bind("<Button-1>", lambda e: on_click())
+        # store callback on inner so we can re-bind after content is added
+        inner._click_cb = on_click
+    return inner, outer
+
+def rebind_panel(inner):
+    """Call after adding widgets to a panel to ensure full touch coverage."""
+    if hasattr(inner, '_click_cb'):
+        bind_all_children(inner, "<Button-1>", inner._click_cb)
 
 # ═════════════════════════════════════════════════════════════
 class Dashboard:
@@ -117,27 +139,60 @@ class Dashboard:
         self.root.bind("<Escape>", lambda e: self.root.destroy())
 
         self.shared_state = shared_state or {
-            "target": "???",
-            "prev_target": "???",
-            "last_gen": 0,
-            "last_chance": None,
+            "target": "???", "prev_target": "???",
+            "last_gen": 0, "last_chance": None,
         }
-
-        # dirty flags — piss.py sets these to True to trigger instant redraws
         self.shared_state.setdefault("scores_dirty", False)
         self.shared_state.setdefault("chances_dirty", False)
 
         self.quotes = parse_quotes(QUOTES_FILE)
         self.responses, self.chance_events = load_framework()
-
-        # snapshot of last_chance so we can detect changes
         self._last_chance_seen = None
+
+        # overlay frame (hidden until a panel is tapped)
+        self._overlay = None
 
         self._build_ui()
 
+    # ── OVERLAY (fullscreen zoom) ─────────────────────────────
+    def _show_overlay(self, build_fn):
+        """build_fn(frame, w, h) fills the overlay frame."""
+        if self._overlay:
+            self._overlay.destroy()
+
+        ow = SW
+        oh = SH - BODY_Y
+        self._overlay = tk.Frame(self.root, bg=PANEL, bd=0)
+        self._overlay.place(x=0, y=BODY_Y, width=ow, height=oh)
+
+        # accent top stripe
+        tk.Frame(self._overlay, bg=ACCENT, height=2).place(x=0, y=0, width=ow)
+
+        # content area
+        content = tk.Frame(self._overlay, bg=PANEL)
+        content.place(x=0, y=2, width=ow, height=oh-2)
+
+        build_fn(content, ow, oh-2)
+
+        # tap anywhere to close
+        self._overlay.bind("<Button-1>", lambda e: self._close_overlay())
+        content.bind("<Button-1>", lambda e: self._close_overlay())
+        # also bind all child widgets after they're created
+        self.root.after(50, lambda: self._bind_overlay_children(self._overlay))
+
+    def _bind_overlay_children(self, widget):
+        widget.bind("<Button-1>", lambda e: self._close_overlay())
+        for child in widget.winfo_children():
+            self._bind_overlay_children(child)
+
+    def _close_overlay(self):
+        if self._overlay:
+            self._overlay.destroy()
+            self._overlay = None
+
+    # ── MAIN LAYOUT ──────────────────────────────────────────
     def _build_ui(self):
         tk.Frame(self.root, bg=ACCENT, height=2).place(x=0, y=0, width=SW)
-
         hdr = tk.Frame(self.root, bg=PANEL, height=22)
         hdr.place(x=0, y=2, width=SW)
         tk.Label(hdr, text="POOPID BOT", font=FB, fg=ACCENT, bg=PANEL).place(x=8, y=2)
@@ -148,7 +203,6 @@ class Dashboard:
         self._build_quote(4,   27,  228, 140)
         self._build_minigame(4, 171, 228, 46)
         self._build_last_chance(4, 221, 228, 94)
-
         self._build_leaderboard_scores(236, 27,  240, 140)
         self._build_leaderboard_chances(236, 171, 240, 144)
 
@@ -156,73 +210,138 @@ class Dashboard:
 
     # ── QUOTE ────────────────────────────────────────────────
     def _build_quote(self, x, y, w, h):
-        f = make_panel(self.root, x, y, w, h, "// QUOTE")
-        self.q_lbl = tk.Label(f, text="", font=("Courier", 11, "italic"),
+        inner, outer = make_panel(self.root, x, y, w, h, "// QUOTE",
+                                   clickable=True,
+                                   on_click=self._zoom_quote)
+        self.q_lbl = tk.Label(inner, text="", font=("Courier", 11, "italic"),
             fg=FG, bg=PANEL, wraplength=w-14, justify="left", anchor="nw")
         self.q_lbl.place(x=6, y=2, width=w-12, height=h-26)
-        self.a_lbl = tk.Label(f, text="", font=FS, fg=CYAN, bg=PANEL, anchor="e")
+        self.a_lbl = tk.Label(inner, text="", font=FS, fg=CYAN, bg=PANEL, anchor="e")
         self.a_lbl.place(x=6, y=h-22, width=w-12)
+        rebind_panel(inner)
         self._refresh_quote()
 
     def _refresh_quote(self):
-        q, a = random.choice(self.quotes)
+        self._cur_quote = random.choice(self.quotes)
+        q, a = self._cur_quote
         self.q_lbl.config(text=f'"{trunc(q, 130)}"')
         self.a_lbl.config(text=f"— {a}" if a else "— unknown")
+        # also update zoom labels if quote overlay is open
+        if hasattr(self, '_zoom_q_lbl') and self._zoom_q_lbl.winfo_exists():
+            self._zoom_q_lbl.config(text=f'"{q}"')
+        if hasattr(self, '_zoom_a_lbl') and self._zoom_a_lbl.winfo_exists():
+            self._zoom_a_lbl.config(text=f"— {a}" if a else "— unknown")
         self.root.after(60000, self._refresh_quote)
+
+    def _zoom_quote(self):
+        q, a = self._cur_quote
+        def build(f, w, h):
+            tk.Label(f, text="// QUOTE", font=FZ, fg=ACCENT, bg=PANEL,
+                     anchor="w").place(x=12, y=10)
+            self._zoom_q_lbl = tk.Label(f, text=f'"{q}"',
+                     font=("Courier", 13, "italic"),
+                     fg=FG, bg=PANEL, wraplength=w-24, justify="left",
+                     anchor="nw")
+            self._zoom_q_lbl.place(x=12, y=40, width=w-24, height=h-80)
+            self._zoom_a_lbl = tk.Label(f, text=f"— {a}" if a else "— unknown",
+                     font=("Courier", 10), fg=CYAN, bg=PANEL, anchor="e")
+            self._zoom_a_lbl.place(x=12, y=h-36, width=w-24)
+            tk.Label(f, text="tap to close", font=FS, fg=DIM, bg=PANEL,
+                     anchor="center").place(x=0, y=h-18, width=w)
+        self._show_overlay(build)
 
     # ── LAST TARGET ──────────────────────────────────────────
     def _build_minigame(self, x, y, w, h):
-        f = make_panel(self.root, x, y, w, h, "// LAST TARGET")
-        tk.Label(f, text="was:", font=FS, fg=DIM, bg=PANEL).place(x=6, y=6)
-        self.prev_tgt_lbl = tk.Label(f, text="???", font=FT, fg=DIM, bg=PANEL)
+        inner, outer = make_panel(self.root, x, y, w, h, "// LAST TARGET",
+                                   clickable=True,
+                                   on_click=self._zoom_target)
+        tk.Label(inner, text="was:", font=FS, fg=DIM, bg=PANEL).place(x=6, y=6)
+        self.prev_tgt_lbl = tk.Label(inner, text="???", font=FT, fg=DIM, bg=PANEL)
         self.prev_tgt_lbl.place(x=38, y=2)
+        rebind_panel(inner)
         self._refresh_target()
 
     def _refresh_target(self):
         prev = self.shared_state.get("prev_target") or "???"
         self.prev_tgt_lbl.config(text=prev)
-        # also check if scores need redraw (target was just hit)
         if self.shared_state.get("scores_dirty"):
             self.shared_state["scores_dirty"] = False
             self._draw_scores()
         self.root.after(500, self._refresh_target)
 
-    # ── LAST CHANCE EVENT ────────────────────────────────────
-    def _build_last_chance(self, x, y, w, h):
-        f = make_panel(self.root, x, y, w, h, "// LAST CHANCE EVENT")
+    def _zoom_target(self):
+        prev = self.shared_state.get("prev_target") or "???"
+        current = self.shared_state.get("target") or "???"
+        def build(f, w, h):
+            tk.Label(f, text="// MINIGAME", font=FZ, fg=ACCENT, bg=PANEL,
+                     anchor="w").place(x=12, y=10)
+            tk.Label(f, text="last target", font=("Courier", 10), fg=DIM,
+                     bg=PANEL).place(x=12, y=46)
+            tk.Label(f, text=prev, font=("Courier", 48, "bold"), fg=DIM,
+                     bg=PANEL).place(x=12, y=64)
+            tk.Label(f, text="current (secret!)", font=("Courier", 10), fg=DIM,
+                     bg=PANEL).place(x=w//2+8, y=46)
+            # blur current target — show as ??? since it'd be cheating
+            tk.Label(f, text="???", font=("Courier", 48, "bold"), fg=BORDER,
+                     bg=PANEL).place(x=w//2+8, y=64)
+            tk.Label(f, text="tap to close", font=FS, fg=DIM, bg=PANEL,
+                     anchor="center").place(x=0, y=h-18, width=w)
+        self._show_overlay(build)
 
-        self.lc_event_lbl = tk.Label(f, text="none yet",
+    # ── LAST CHANCE ──────────────────────────────────────────
+    def _build_last_chance(self, x, y, w, h):
+        inner, outer = make_panel(self.root, x, y, w, h, "// LAST CHANCE EVENT",
+                                   clickable=True,
+                                   on_click=self._zoom_last_chance)
+        self.lc_event_lbl = tk.Label(inner, text="none yet",
             font=("Courier", 9, "bold"), fg=AMBER, bg=PANEL, anchor="w")
         self.lc_event_lbl.place(x=6, y=4, width=w-12)
-
-        self.lc_user_lbl = tk.Label(f, text="",
-            font=FS, fg=FG, bg=PANEL, anchor="w")
+        self.lc_user_lbl = tk.Label(inner, text="", font=FS, fg=FG, bg=PANEL, anchor="w")
         self.lc_user_lbl.place(x=6, y=22, width=w-12)
-
-        self.lc_odds_lbl = tk.Label(f, text="",
-            font=FS, fg=GREEN, bg=PANEL, anchor="w")
+        self.lc_odds_lbl = tk.Label(inner, text="", font=FS, fg=GREEN, bg=PANEL, anchor="w")
         self.lc_odds_lbl.place(x=6, y=38, width=w-12)
-
+        rebind_panel(inner)
         self._poll_last_chance()
 
     def _poll_last_chance(self):
         lc = self.shared_state.get("last_chance")
-        # only redraw if value actually changed
         if lc is not None and lc is not self._last_chance_seen:
             self._last_chance_seen = lc
             self.lc_event_lbl.config(text=trunc(lc.get("event", ""), 26))
             self.lc_user_lbl.config(text=f"hit by: {lc.get('user', '?')}")
             self.lc_odds_lbl.config(text=f"1/{lc.get('chance', 1000)} odds")
-            # also instantly refresh the chance leaderboard
             self._draw_chances()
         self.root.after(500, self._poll_last_chance)
 
-    # ── LEADERBOARD: scores ──────────────────────────────────
+    def _zoom_last_chance(self):
+        lc = self._last_chance_seen
+        def build(f, w, h):
+            tk.Label(f, text="// LAST CHANCE EVENT", font=FZ, fg=ACCENT,
+                     bg=PANEL, anchor="w").place(x=12, y=10)
+            if lc:
+                tk.Label(f, text=lc.get("event", ""), font=("Courier", 16, "bold"),
+                         fg=AMBER, bg=PANEL, wraplength=w-24,
+                         justify="left").place(x=12, y=46)
+                tk.Label(f, text=f"hit by  {lc.get('user','?')}",
+                         font=("Courier", 12), fg=FG, bg=PANEL).place(x=12, y=110)
+                tk.Label(f, text=f"odds  1/{lc.get('chance',1000)}",
+                         font=("Courier", 12), fg=GREEN, bg=PANEL).place(x=12, y=134)
+            else:
+                tk.Label(f, text="no chance event yet", font=("Courier", 12),
+                         fg=DIM, bg=PANEL).place(x=12, y=80)
+            tk.Label(f, text="tap to close", font=FS, fg=DIM, bg=PANEL,
+                     anchor="center").place(x=0, y=h-18, width=w)
+        self._show_overlay(build)
+
+    # ── LEADERBOARD: scores ───────────────────────────────────
     def _build_leaderboard_scores(self, x, y, w, h):
-        f = make_panel(self.root, x, y, w, h, "// LEADERBOARD")
-        self._lb_score_frame = f
+        inner, outer = make_panel(self.root, x, y, w, h, "// LEADERBOARD",
+                                   clickable=True,
+                                   on_click=self._zoom_scores)
+        self._lb_score_frame = inner
         self._lb_score_w = w
         self._draw_scores()
+        rebind_panel(inner)
         self.root.after(10000, self._tick_scores)
 
     def _draw_scores(self):
@@ -243,24 +362,50 @@ class Dashboard:
         else:
             tk.Label(self._lb_score_frame, text="no scores yet", font=FS,
                      fg=DIM, bg=PANEL).place(x=6, y=6)
+        rebind_panel(self._lb_score_frame)
 
     def _tick_scores(self):
         self._draw_scores()
         self.root.after(10000, self._tick_scores)
 
+    def _zoom_scores(self):
+        def build(f, w, h):
+            tk.Label(f, text="// LEADERBOARD", font=FZ, fg=ACCENT,
+                     bg=PANEL, anchor="w").place(x=12, y=10)
+            scores = load_scores()
+            if scores:
+                sorted_s = sorted(scores.items(), key=lambda x: x[1]["score"], reverse=True)
+                for i, (uid, d) in enumerate(sorted_s[:10], 1):
+                    ry = 40 + (i-1) * 22
+                    col = [AMBER, FG, FG] + [DIM]*10
+                    tk.Label(f, text=f"{i}.", font=("Courier", 10),
+                             fg=col[i-1], bg=PANEL, anchor="w").place(x=12, y=ry)
+                    tk.Label(f, text=trunc(d["name"], 16), font=("Courier", 10),
+                             fg=FG, bg=PANEL, anchor="w").place(x=36, y=ry)
+                    tk.Label(f, text=str(d["score"]), font=("Courier", 10),
+                             fg=GREEN, bg=PANEL, anchor="e").place(x=w-16, y=ry)
+            else:
+                tk.Label(f, text="no scores yet", font=("Courier", 11),
+                         fg=DIM, bg=PANEL).place(x=12, y=60)
+            tk.Label(f, text="tap to close", font=FS, fg=DIM, bg=PANEL,
+                     anchor="center").place(x=0, y=h-18, width=w)
+        self._show_overlay(build)
+
     # ── LEADERBOARD: chance hits ──────────────────────────────
     def _build_leaderboard_chances(self, x, y, w, h):
-        f = make_panel(self.root, x, y, w, h, "// CHANCE HITS")
-        self._lb_chance_frame = f
+        inner, outer = make_panel(self.root, x, y, w, h, "// CHANCE HITS",
+                                   clickable=True,
+                                   on_click=self._zoom_chances)
+        self._lb_chance_frame = inner
         self._lb_chance_w = w
         self._draw_chances()
+        rebind_panel(inner)
         self.root.after(10000, self._tick_chances)
 
     def _draw_chances(self):
         for c in self._lb_chance_frame.winfo_children():
             c.destroy()
         scores = load_scores()
-
         all_chances = {}
         for uid, data in scores.items():
             name = data.get("name", uid)
@@ -268,28 +413,79 @@ class Dashboard:
                 if chance_name not in all_chances:
                     all_chances[chance_name] = []
                 all_chances[chance_name].append((name, count))
-
         if not all_chances:
             tk.Label(self._lb_chance_frame, text="no chance hits yet", font=FS,
                      fg=DIM, bg=PANEL).place(x=6, y=6)
+            rebind_panel(self._lb_chance_frame)
             return
-
+        # 2-column layout: left col x=4, right col x=col_w+6
+        col_w = (self._lb_chance_w - 10) // 2
+        col = 0
         ry = 2
         for event_name in sorted(all_chances.keys()):
-            if ry > 130: break
             top_list = sorted(all_chances[event_name], key=lambda x: x[1], reverse=True)
-            tk.Label(self._lb_chance_frame, text=trunc(event_name, 22),
-                     font=("Courier", 7, "bold"), fg=CYAN, bg=PANEL, anchor="w").place(x=4, y=ry)
-            ry += 11
-            for name, count in top_list[:2]:
-                tk.Label(self._lb_chance_frame, text=f"  {trunc(name,12)} ×{count}",
-                         font=FS, fg=FG, bg=PANEL, anchor="w").place(x=4, y=ry)
-                ry += 11
-            ry += 3
+            cx = 4 if col == 0 else col_w + 6
+            block_h = 11 + len(top_list) * 11  # title + one row per person
+            tk.Label(self._lb_chance_frame, text=trunc(event_name, 13),
+                     font=("Courier", 7, "bold"), fg=CYAN, bg=PANEL, anchor="w").place(x=cx, y=ry)
+            for j, (name, count) in enumerate(top_list):
+                tk.Label(self._lb_chance_frame, text=f"{trunc(name,10)} ×{count}",
+                         font=FS, fg=FG, bg=PANEL, anchor="w").place(x=cx, y=ry+11+j*11)
+            col += 1
+            if col == 2:
+                col = 0
+                ry += block_h + 3
+            if ry > 120:
+                break
+        rebind_panel(self._lb_chance_frame)
 
     def _tick_chances(self):
         self._draw_chances()
         self.root.after(10000, self._tick_chances)
+
+    def _zoom_chances(self):
+        def build(f, w, h):
+            tk.Label(f, text="// CHANCE HITS", font=FZ, fg=ACCENT,
+                     bg=PANEL, anchor="w").place(x=12, y=10)
+            scores = load_scores()
+            all_chances = {}
+            for uid, data in scores.items():
+                name = data.get("name", uid)
+                for chance_name, count in data.get("chances", {}).items():
+                    if chance_name not in all_chances:
+                        all_chances[chance_name] = []
+                    all_chances[chance_name].append((name, count))
+            if not all_chances:
+                tk.Label(f, text="no chance hits yet", font=("Courier", 11),
+                         fg=DIM, bg=PANEL).place(x=12, y=60)
+            else:
+                # 2-column layout in zoom view, all scores per event
+                col_w = (w - 24) // 2
+                col = 0
+                ry = 38
+                left_block_h = 0  # track left col height to advance ry correctly
+                for event_name in sorted(all_chances.keys()):
+                    top_list = sorted(all_chances[event_name], key=lambda x: x[1], reverse=True)
+                    block_h = 14 + len(top_list) * 13
+                    cx = 12 if col == 0 else 12 + col_w + 8
+                    tk.Label(f, text=trunc(event_name, 18),
+                             font=("Courier", 9, "bold"), fg=CYAN, bg=PANEL,
+                             anchor="w").place(x=cx, y=ry)
+                    for j, (name, count) in enumerate(top_list):
+                        tk.Label(f, text=f"  {trunc(name,14)} ×{count}",
+                                 font=("Courier", 9), fg=FG, bg=PANEL,
+                                 anchor="w").place(x=cx, y=ry + 14 + j*13)
+                    if col == 0:
+                        left_block_h = block_h
+                        col = 1
+                    else:
+                        # advance by the taller of the two columns
+                        ry += max(left_block_h, block_h) + 6
+                        col = 0
+                        left_block_h = 0
+            tk.Label(f, text="tap to close", font=FS, fg=DIM, bg=PANEL,
+                     anchor="center").place(x=0, y=h-18, width=w)
+        self._show_overlay(build)
 
     # ── CLOCK ────────────────────────────────────────────────
     def _tick(self):
