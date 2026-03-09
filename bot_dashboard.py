@@ -6,6 +6,7 @@ import yaml
 import os
 import datetime
 import threading
+import calendar_sync
 import tkinter.font as tkfont
 
 QUOTES_FILE    = os.path.join("log", "quotes.txt")
@@ -147,6 +148,9 @@ class Dashboard:
         self.shared_state.setdefault("chances_dirty", False)
 
         self.quotes = parse_quotes(QUOTES_FILE)
+        self._meetings = []
+        self._next_meeting = None
+        self._fetch_meetings()
         self.responses, self.chance_events = load_framework()
         self._last_chance_seen = None
 
@@ -204,6 +208,8 @@ class Dashboard:
                                       width=SW, height=22)
         self._bar_canvas.place(x=0, y=0)
 
+        # meetings
+        self._bar_canvas.bind("<Button-1>", lambda e: self._zoom_calendar())
         # filled progress rect (drawn first = behind)
         self._bar_fill   = self._bar_canvas.create_rectangle(0, 0, 0, 22, fill=DIM, outline="")
         # lunch block
@@ -529,6 +535,24 @@ class Dashboard:
         self._bar_canvas.coords(self._bar_lunch, lunch_x1, 0, lunch_x2, 22)
         # cursor line
         self._bar_canvas.coords(self._bar_cursor, now_x, 0, now_x, 22)
+        
+        # draw meeting blocks
+        for item_id in getattr(self, '_meeting_items', []):
+            self._bar_canvas.delete(item_id)
+        self._meeting_items = []
+        for m in self._meetings:
+            if m.get("date") != datetime.datetime.now().date():
+                continue
+            mx1 = to_x(m["start"])
+            mx2 = to_x(m["end"])
+            item = self._bar_canvas.create_rectangle(
+                mx1, 2, mx2, 20, fill="#2563eb", outline=""
+            )
+            self._meeting_items.append(item)
+        # keep text on top
+        self._bar_canvas.tag_raise(self._bar_cursor)
+        self._bar_canvas.tag_raise(self._bar_title)
+        self._bar_canvas.tag_raise(self._bar_clock)
 
         # flip title color: black when yellow bar is behind it, accent otherwise
         # "POOPID BOT" starts at x=8, approx 9 chars * 8px per char at size 11
@@ -548,6 +572,45 @@ class Dashboard:
         now_str = datetime.datetime.now().strftime("%H:%M:%S")
         self._bar_canvas.itemconfig(self._bar_clock, text=now_str)
         self.root.after(1000, self._tick)
+    
+    # ── CALENDAR SYNC ───────────────────────────────────────
+    def _fetch_meetings(self):
+        try:
+            all_meetings = calendar_sync.get_todays_meetings()
+            self._meetings = all_meetings  # full week for the bar
+            now = datetime.datetime.now()
+            today = now.date()
+            # next meeting is only from today
+            upcoming = [m for m in self._meetings
+                        if m["date"] == today and m["end"] > now]
+            self._next_meeting = upcoming[0] if upcoming else None
+        except Exception as e:
+            print(f"[Calendar] {e}")
+            self._meetings = []
+            self._next_meeting = None
+        self.root.after(300000, self._fetch_meetings)
+    
+    def _zoom_calendar(self):
+        m = self._next_meeting
+        def build(f, w, h):
+            tk.Label(f, text="// NEXT MEETING", font=FZ, fg=ACCENT,
+                     bg=PANEL, anchor="w").place(x=12, y=10)
+            if m:
+                duration = int((m["end"] - m["start"]).total_seconds() // 60)
+                tk.Label(f, text=m["title"],
+                         font=("Courier", 13, "bold"), fg=FG, bg=PANEL,
+                         wraplength=w-24, justify="left").place(x=12, y=42)
+                tk.Label(f, text=f'{m["start"].strftime("%H:%M")} → {m["end"].strftime("%H:%M")}  ({duration} min)',
+                         font=("Courier", 11), fg=CYAN, bg=PANEL).place(x=12, y=110)
+                loc = m["location"] or "no location"
+                tk.Label(f, text=loc, font=("Courier", 10),
+                         fg=DIM, bg=PANEL, wraplength=w-24).place(x=12, y=134)
+            else:
+                tk.Label(f, text="no more meetings today",
+                         font=("Courier", 12), fg=DIM, bg=PANEL).place(x=12, y=80)
+            tk.Label(f, text="tap to close", font=FS, fg=DIM, bg=PANEL,
+                     anchor="center").place(x=0, y=h-18, width=w)
+        self._show_overlay(build)
 
 
 def main(shared_state=None):

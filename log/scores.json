@@ -3,11 +3,11 @@
         "score": 4,
         "name": "Niko",
         "chances": {
-            "silly-bot_replies": 2,
+            "silly-bot_replies": 3,
             "stupid_says": 5,
-            "WAAAAT_replies": 3,
+            "WAAAAT_replies": 4,
             "random_replies": 15,
-            "mocking": 5
+            "mocking": 6
         }
     },
     "483868190498357248": {
@@ -29,14 +29,14 @@
         }
     },
     "279880443200012288": {
-        "score": 1,
+        "score": 3,
         "name": "seam",
         "chances": {
-            "stupid_says": 2,
+            "stupid_says": 3,
             "random_replies": 3,
-            "WAAAAT_replies": 4,
+            "WAAAAT_replies": 5,
             "silly-bot_replies": 4,
-            "mocking": 1
+            "mocking": 2
         }
     },
     "646937666251915264": {

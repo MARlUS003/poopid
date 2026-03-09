@@ -14,6 +14,7 @@ import dotenv
 import threading
 
 
+
 # --- CONFIGURATION ---
 dotenv.load_dotenv()
 TOKEN = os.getenv("TOKEN")
