@@ -6,8 +6,9 @@ import yaml
 import os
 import datetime
 import threading
-import calendar_sync
 import tkinter.font as tkfont
+
+from libs import calendar_sync
 
 QUOTES_FILE    = os.path.join("log", "quotes.txt")
 FRAMEWORK_FILE = "framework.yml"

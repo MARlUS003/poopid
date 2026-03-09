@@ -7,12 +7,13 @@ import asyncio
 import time
 import json
 import yaml
-import bar  # Import the updated bar logic
-import media_utils  # Import moved media logic
-import clip  # Import clip logic
 import dotenv
 import threading
 
+import libs.bar as bar
+import libs.media_utils as media_utils
+import libs.clip as clip
+import libs.bot_dashboard as bot_dashboard
 
 
 # --- CONFIGURATION ---
@@ -439,7 +440,6 @@ async def on_message(message):
                 break
 
 def start_dashboard():
-    import bot_dashboard
     bot_dashboard.main(minigame_state)
 
 dashboard_thread = threading.Thread(target=start_dashboard, daemon=True)

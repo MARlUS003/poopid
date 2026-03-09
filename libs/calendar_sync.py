@@ -3,6 +3,9 @@ import datetime
 import os
 from icalendar import Calendar
 import recurring_ical_events
+import dotenv
+
+dotenv.load_dotenv()
 
 ICS_URL = os.getenv("CALENDAR_ICS_URL")
 EXCLUDED_MEETINGS = [
