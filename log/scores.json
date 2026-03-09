@@ -1,6 +1,6 @@
 {
     "1271500729537794229": {
-        "score": 4,
+        "score": 3,
         "name": "Niko",
         "chances": {
             "silly-bot_replies": 3,
@@ -29,12 +29,12 @@
         }
     },
     "279880443200012288": {
-        "score": 3,
+        "score": 2,
         "name": "seam",
         "chances": {
             "stupid_says": 3,
             "random_replies": 3,
-            "WAAAAT_replies": 5,
+            "WAAAAT_replies": 6,
             "silly-bot_replies": 4,
             "mocking": 2
         }

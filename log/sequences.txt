@@ -17,7 +17,7 @@
 "ålg" []
 "rmm" []
 "ult" []
-"men" [x]
+"men" [x] :3
 "cwe" []
 "yli" []
 "ccw" []
@@ -47,3 +47,9 @@
 "u å" []
 "vms" []
 "opm" []
+"hqb" []
+"gj " []
+"nts" []
+"y t" []
+"qpc" []
+"jxm" []
