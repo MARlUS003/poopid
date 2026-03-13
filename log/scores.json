@@ -24,7 +24,7 @@
         "name": "SOFI",
         "chances": {
             "mocking": 2,
-            "stupid_says": 1,
+            "stupid_says": 2,
             "random_replies": 2
         }
     },
@@ -33,10 +33,10 @@
         "name": "seam",
         "chances": {
             "stupid_says": 4,
-            "random_replies": 3,
+            "random_replies": 4,
             "WAAAAT_replies": 7,
             "silly-bot_replies": 4,
-            "mocking": 3
+            "mocking": 4
         }
     },
     "646937666251915264": {
